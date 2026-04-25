@@ -10,6 +10,8 @@ Hackathon rules ask for **URLs**, not large binaries in the Space repo. Add ever
 | Training Colab (Unsloth or TRL) | *add in Phase 3* | TBD |
 | Mini-blog (Hugging Face post) | *add in Phase 7* | TBD |
 | Demo video (YouTube, under 2 minutes) | *add in Phase 7* | TBD |
+| Phase 4 plots (PNG) | [`results/phase4_episode_return.png`](../results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](../results/phase4_mean_return_bar.png) | Regenerate: `python -m eval.phase4_benchmark` |
+| Phase 4 metrics table | [`results/phase4_metrics.md`](../results/phase4_metrics.md) | Committed |
 | Slides (Google Slides / PDF host) | *optional* | TBD |
 | Weights & Biases (or other) run | *optional — link to a specific run* | TBD |
 

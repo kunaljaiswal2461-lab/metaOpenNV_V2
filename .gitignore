@@ -26,3 +26,8 @@ ENV/
 !inference.py
 !out.txt
 !requirements.txt
+
+# Phase 4 committed plots + table (checkpoint stays ignored via *.pt)
+!results/phase4_metrics.md
+!results/phase4_episode_return.png
+!results/phase4_mean_return_bar.png

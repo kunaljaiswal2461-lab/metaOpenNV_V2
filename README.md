@@ -51,13 +51,13 @@ Single place for reviewers (mirrored in [`docs/MATERIALS.md`](docs/MATERIALS.md)
 | **Training Colab** (Unsloth or HF TRL) | *URL to be added in Phase 3* | Judges re-run training here |
 | **Mini-blog** (HF post) | *URL to be added in Phase 7* | &lt; 2 min read OK |
 | **Demo video** (YouTube) | *URL to be added in Phase 7* | **&lt; 2 minutes**; link only |
-| **Plots / results** | *Paths under `results/` in Phase 4* | Loss + reward curves, baseline vs trained |
+| **Plots / results** | [`results/phase4_episode_return.png`](results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png), [`results/phase4_metrics.md`](results/phase4_metrics.md) | Phase 4 benchmark (regenerate via `python -m eval.phase4_benchmark`) |
 
 ### 3-minute read for judges
 
 1. **Problem:** LLMs need grounded, multi-step **decisions under market friction**, not one-shot financial text.  
 2. **Environment:** SPY bars + engineered features + portfolio state; **reset/step** API; episode sampling over held-out-style train split.  
-3. **Results:** *Phase 4 — placeholder; will embed committed PNGs and a short metrics table here.*  
+3. **Results:** See **Phase 4 (Results)** below — committed reward curves and [`results/phase4_metrics.md`](results/phase4_metrics.md).  
 4. **Why it matters:** Improves **tool-like control** and **long-horizon consistency** for professional / assistant-style agents (see Phase 0 themes).
 
 ---
@@ -104,8 +104,33 @@ python -m pytest tests/test_env.py -q
 
 ---
 
+## Phase 4 (Results)
+
+**Goal:** Observable evidence vs baselines on the **same** `TradingEnvironment` physics as the server (local eval for reproducible plots).
+
+**How to regenerate**
+
+```bash
+python -m eval.phase4_benchmark
+# optional: python -m eval.phase4_benchmark --eval-episodes 30 --train-episodes 120
+```
+
+**Episode total reward** (sum of per-step rewards) by policy — each line is one policy over consecutive evaluation episodes (`random_episode_start=False` for a controlled comparison):
+
+![Phase 4 episode returns](results/phase4_episode_return.png)
+
+**Mean episode reward ± std** across policies (same eval episodes as above):
+
+![Phase 4 mean return bar](results/phase4_mean_return_bar.png)
+
+**Table (auto-generated, committed):** see [`results/phase4_metrics.md`](results/phase4_metrics.md).
+
+**Reading the run:** `random` is destructive on average; `always_hold` is the cash baseline; **`buy_once_then_hold`** and **`sma20_trend`** are simple structured policies that capture upside on this SPY split; **DQN (greedy)** here matches `always_hold` under the default short training + fixed-start eval — raise `--train-episodes` or switch to **Phase 3 TRL / Unsloth** on trajectories for judge-facing “LLM improved after training” evidence.
+
+---
+
 ## 🧭 SYSTEM NAVIGATION
-[Phase 1](#phase-1-judge-materials) | [Phase 2](#phase-2-openenv-api-contract) | [🏠 Overview](#-getting-started) | [⚙️ Specifications](#-environment-specification) | [📉 Market Dynamics](#-data--market-dynamics) | [🎯 Scoring](#-tasks--scoring) | [🤖 Agent Loop](#-agent--api) | [📁 Structure](#-file-structure)
+[Phase 1](#phase-1-judge-materials) | [Phase 2](#phase-2-openenv-api-contract) | [Phase 4](#phase-4-results) | [🏠 Overview](#-getting-started) | [⚙️ Specifications](#-environment-specification) | [📉 Market Dynamics](#-data--market-dynamics) | [🎯 Scoring](#-tasks--scoring) | [🤖 Agent Loop](#-agent--api) | [📁 Structure](#-file-structure)
 
 ---
 
