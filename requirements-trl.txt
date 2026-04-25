@@ -1,0 +1,9 @@
+# Phase 3 — install in Colab or a local venv (do not add to Space Docker unless needed).
+# Pin loosely so Colab resolver stays happy; tighten for reproducibility if you want.
+trl>=0.15.0
+transformers>=4.44.0
+accelerate>=0.34.0
+datasets>=3.0.0
+peft>=0.14.0
+torch>=2.1.0
+matplotlib>=3.8.0

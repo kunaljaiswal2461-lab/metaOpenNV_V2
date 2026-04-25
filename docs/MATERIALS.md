@@ -7,7 +7,7 @@ Hackathon rules ask for **URLs**, not large binaries in the Space repo. Add ever
 | OpenEnv API contract (README Phase 2) | *in-repo* [`README.md`](../README.md#phase-2-openenv-api-contract) | Live |
 | Hugging Face Space | https://huggingface.co/spaces/Kj2461/metaOpenNV_V2 | Live |
 | Source (GitHub) | https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2 | Live |
-| Training Colab (Unsloth or TRL) | *add in Phase 3* | TBD |
+| Training Colab (HF TRL SFT) | [Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb) | Same flow as README Phase 3 |
 | Mini-blog (Hugging Face post) | *add in Phase 7* | TBD |
 | Demo video (YouTube, under 2 minutes) | *add in Phase 7* | TBD |
 | Phase 4 plots (PNG) | [`results/phase4_episode_return.png`](../results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](../results/phase4_mean_return_bar.png) | Regenerate: `python -m eval.phase4_benchmark` |

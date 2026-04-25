@@ -48,10 +48,10 @@ Single place for reviewers (mirrored in [`docs/MATERIALS.md`](docs/MATERIALS.md)
 | **Hugging Face Space** | [https://huggingface.co/spaces/Kj2461/metaOpenNV_V2](https://huggingface.co/spaces/Kj2461/metaOpenNV_V2) | Runnable environment |
 | **GitHub source** | [https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2](https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2) | Version-controlled code |
 | **OpenEnv manifest** | [`openenv.yaml`](openenv.yaml) | Default `observation_space.shape: [203]` matches `WINDOW_SIZE=20` in Docker |
-| **Training Colab** (Unsloth or HF TRL) | *URL to be added in Phase 3* | Judges re-run training here |
+| **Training Colab** (HF TRL SFT) | [Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb) | Clone repo, `pip install -r requirements-trl.txt`, collect JSONL from Space, run `SFTTrainer`; loss → `results/trl_sft_loss.png` |
 | **Mini-blog** (HF post) | *URL to be added in Phase 7* | &lt; 2 min read OK |
 | **Demo video** (YouTube) | *URL to be added in Phase 7* | **&lt; 2 minutes**; link only |
-| **Plots / results** | [`results/phase4_episode_return.png`](results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png), [`results/phase4_metrics.md`](results/phase4_metrics.md) | Phase 4 benchmark (regenerate via `python -m eval.phase4_benchmark`) |
+| **Plots / results** | [`results/phase4_episode_return.png`](results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png), [`results/phase4_metrics.md`](results/phase4_metrics.md); Phase 3 loss (local/Colab): `results/trl_sft_loss.png` | Phase 4: `python -m eval.phase4_benchmark`. Phase 3: [`scripts/trl_sft_train.py`](scripts/trl_sft_train.py) after [`scripts/collect_sft_dataset.py`](scripts/collect_sft_dataset.py) |
 
 ### 3-minute read for judges
 
@@ -104,6 +104,35 @@ python -m pytest tests/test_env.py -q
 
 ---
 
+## Phase 3 (TRL supervised fine-tuning)
+
+**Goal:** Turn **on-policy rollouts** from the same OpenEnv physics (HTTP `TradingEnv` against the live Space, or `--local` for dev) into **SFT rows** with an **SMA20-distance teacher** (`trl_data/prompt_utils.py`), then fine-tune a small causal / instruct model with **TRL `SFTTrainer`**.
+
+**Install (not in Space Docker by default)**
+
+```bash
+pip install -r requirements-trl.txt
+```
+
+**Collect JSONL** (set `SPACE_URL` to your Space root, or pass `--local`):
+
+```bash
+set SPACE_URL=https://huggingface.co/spaces/Kj2461/metaOpenNV_V2
+python scripts/collect_sft_dataset.py --episodes 12 --max-steps 400 --task-name risk_aware_trading
+```
+
+**Train** (GPU recommended; on CPU use a tiny model such as `distilgpt2` for smoke tests):
+
+```bash
+python scripts/trl_sft_train.py --data data/trl_sft_train.jsonl --epochs 1 --output-dir results/phase3_lora
+```
+
+**Outputs:** `data/trl_sft_train.jsonl` is gitignored (regenerate anytime); **`results/trl_sft_loss.png`** and adapter weights under **`--output-dir`**.
+
+**Judges:** use the **Phase 1** Colab link — it runs the same commands against your Space.
+
+---
+
 ## Phase 4 (Results)
 
 **Goal:** Observable evidence vs baselines on the **same** `TradingEnvironment` physics as the server (local eval for reproducible plots).
@@ -125,12 +154,12 @@ python -m eval.phase4_benchmark
 
 **Table (auto-generated, committed):** see [`results/phase4_metrics.md`](results/phase4_metrics.md).
 
-**Reading the run:** `random` is destructive on average; `always_hold` is the cash baseline; **`buy_once_then_hold`** and **`sma20_trend`** are simple structured policies that capture upside on this SPY split; **DQN (greedy)** here matches `always_hold` under the default short training + fixed-start eval — raise `--train-episodes` or switch to **Phase 3 TRL / Unsloth** on trajectories for judge-facing “LLM improved after training” evidence.
+**Reading the run:** `random` is destructive on average; `always_hold` is the cash baseline; **`buy_once_then_hold`** and **`sma20_trend`** are simple structured policies that capture upside on this SPY split; **DQN (greedy)** here matches `always_hold` under the default short training + fixed-start eval — raise `--train-episodes` or use **Phase 3 TRL SFT** on trajectories for judge-facing “LLM improved after training” evidence.
 
 ---
 
 ## 🧭 SYSTEM NAVIGATION
-[Phase 1](#phase-1-judge-materials) | [Phase 2](#phase-2-openenv-api-contract) | [Phase 4](#phase-4-results) | [🏠 Overview](#-getting-started) | [⚙️ Specifications](#-environment-specification) | [📉 Market Dynamics](#-data--market-dynamics) | [🎯 Scoring](#-tasks--scoring) | [🤖 Agent Loop](#-agent--api) | [📁 Structure](#-file-structure)
+[Phase 1](#phase-1-judge-materials) | [Phase 2](#phase-2-openenv-api-contract) | [Phase 3](#phase-3-trl-supervised-fine-tuning) | [Phase 4](#phase-4-results) | [🏠 Overview](#-getting-started) | [⚙️ Specifications](#-environment-specification) | [📉 Market Dynamics](#-data--market-dynamics) | [🎯 Scoring](#-tasks--scoring) | [🤖 Agent Loop](#-agent--api) | [📁 Structure](#-file-structure)
 
 ---
 
