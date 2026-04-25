@@ -12,6 +12,33 @@ pinned: true
 
 ---
 
+## Submission thesis (Phase 0 — scope freeze)
+
+This section is the **single source of truth** for hackathon scope until Phase 1 completes. New major environment ideas require updating this section first. Criteria reference: [Apr ’26 OpenEnv Hackathon — themes & judging](https://docs.google.com/document/d/1AXXq9Mmjhjlwg2HmHiOLyQC9zee_MDmuqYXFy70fQuQ/edit?usp=sharing).
+
+**Live Space (submission target):** [https://huggingface.co/spaces/Kj2461/metaOpenNV_V2](https://huggingface.co/spaces/Kj2461/metaOpenNV_V2)
+
+### Theme alignment
+
+| Role | Theme |
+| :--- | :--- |
+| **Primary** | **#3.1 Professional tasks** — a defined, partially observable **market world**: the agent consumes structured signals and tool-like state (prices, indicators, portfolio), acts through a strict API, and receives outcomes it cannot shortcut without maintaining internal state across steps. |
+| **Secondary (pitch)** | **#2 Long-horizon planning & instruction following** — episodes unfold over many steps; good behavior depends on **sequences** of decisions under execution costs and shaped/delayed feedback, not a single-turn answer. |
+
+### One sentence for judges
+
+We give LLMs a **realistic SPY trading simulator** (OpenEnv-compliant) where they must map **multi-step market context + portfolio state** to **hold / buy / sell** under **transaction costs and composite risk-aware rewards**, so training improves **grounded decision-making under uncertainty** instead of generic financial chat.
+
+### Problem → environment → reward → why an LLM gets better (five bullets)
+
+1. **Problem:** Models are strong at financial prose but weak at **closed-loop control**: sizing actions, respecting friction, and staying coherent over long trajectories when the world pushes back bar-by-bar.
+2. **Observation & action:** The agent sees a **fixed-length window** of engineered features (returns, trend distances, RSI, volume regime, volatility, VWAP distance, EMA/MACD/ATR-style signals) plus **cash, holdings, and portfolio value**; actions are **discrete** (hold / buy / sell) with an optional **continuous fraction** of cash or position to trade.
+3. **Reward:** A **composite, dense-style** signal (portfolio change, downside pressure, risk-adjusted components, market-relative terms — see `reward.py`) so learning is guided **before** the episode ends, not only by a terminal label.
+4. **Why an LLM gets better here:** The task forces **token-budget-friendly structured reasoning** over numeric state, **memory** of position and PnL path, and **incentive alignment** with a reward that penalizes naive churn and tail risk — capabilities that transfer to any agent that must **act** under constraints, not just describe markets.
+5. **Scope freeze:** Until Phase 1 exit criteria are met, we **do not** add new primary domains (e.g. unrelated games or second asset classes); we may only tighten docs, links, OpenEnv manifest accuracy, and the training/evaluation **pipeline** around this thesis.
+
+---
+
 ## 🧭 SYSTEM NAVIGATION
 [🏠 Overview](#-getting-started) | [⚙️ Specifications](#-environment-specification) | [📉 Market Dynamics](#-data--market-dynamics) | [🎯 Scoring](#-tasks--scoring) | [🤖 Agent Loop](#-agent--api) | [📁 Structure](#-file-structure)
 
