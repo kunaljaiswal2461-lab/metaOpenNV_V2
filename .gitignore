@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+venv/
+ENV/
+# Explicitly ALLOW our code folder
+!env/
+
+# Project Logs
+*.txt
+*.pth
+*.pt
+*out*
+*.log
+*.ps1
+.antigravity/
+
+# Data
+!data/spy_prices.csv
+
+# Exceptions
+!inference.py
+!out.txt
+!requirements.txt

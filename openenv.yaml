@@ -1,0 +1,31 @@
+spec_version: 1
+name: trading-env
+version: 0.1.0
+description: >
+  RL Financial Market Simulator. Trade SPY to maximize profit.
+  Actions: 0=HOLD, 1=BUY, 2=SELL
+server:
+  type: docker
+  build: ./server/Dockerfile
+tasks:
+  - name: spy_trading
+    description: >
+      A simple market environment to test basic agents.
+    env_vars: {WINDOW_SIZE: '10'}
+  - name: risk_aware_trading
+    description: >
+      Standard test for smart agents.
+    env_vars: {WINDOW_SIZE: '20'}
+  - name: multi_horizon_trading
+    description: >
+      Advanced test for deep agents with full history window.
+    env_vars: {WINDOW_SIZE: '50'}
+entrypoint:
+  type: rest_api
+  http:
+    route: /reset, /step
+observation_space:
+  type: continuous
+  shape: [203]
+action:
+  type: discrete
