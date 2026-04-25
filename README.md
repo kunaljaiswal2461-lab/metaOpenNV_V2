@@ -51,7 +51,7 @@ Single place for reviewers (mirrored in [`docs/MATERIALS.md`](docs/MATERIALS.md)
 | **Training Colab** (HF TRL SFT) | [Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb) | Clone repo, `pip install -r requirements-trl.txt`, collect JSONL from Space, run `SFTTrainer`; loss → `results/trl_sft_loss.png` |
 | **Mini-blog** (HF post) | *URL to be added in Phase 7* | &lt; 2 min read OK |
 | **Demo video** (YouTube) | *URL to be added in Phase 7* | **&lt; 2 minutes**; link only |
-| **Plots / results** | [`results/phase4_episode_return.png`](results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png), [`results/phase4_metrics.md`](results/phase4_metrics.md); Phase 3 loss (local/Colab): `results/trl_sft_loss.png` | Phase 4: `python -m eval.phase4_benchmark`. Phase 3: [`scripts/trl_sft_train.py`](scripts/trl_sft_train.py) after [`scripts/collect_sft_dataset.py`](scripts/collect_sft_dataset.py) |
+| **Plots / results** | [`results/phase4_episode_return.png`](results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png), [`results/phase4_metrics.md`](results/phase4_metrics.md), [`results/trl_sft_loss.png`](results/trl_sft_loss.png) (distilgpt2 smoke, 360 rows) | Phase 4: `python -m eval.phase4_benchmark`. Phase 3: [`scripts/trl_sft_train.py`](scripts/trl_sft_train.py) after [`scripts/collect_sft_dataset.py`](scripts/collect_sft_dataset.py) |
 
 ### 3-minute read for judges
 
