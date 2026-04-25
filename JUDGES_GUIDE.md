@@ -15,6 +15,16 @@ The environment is a high-fidelity simulator for the **SPY (S&P 500 ETF)**. It f
 4.  **State Update**: The environment executes the trade, calculates transaction costs (0.1%), updates the Portfolio Value (PV), and computes the Reward.
 5.  **Termination**: The session ends if portfolio value falls below **40%** of initial capital, the sampled episode segment ends, or the data sequence concludes.
 
+### REST surface (OpenEnv-style)
+
+| Endpoint | Role |
+| :--- | :--- |
+| `POST /reset` | Start or restart an episode; optional `{"task_name": "..."}` selects curriculum window (10 / 20 / 50 bars). |
+| `POST /step` | Apply `TradingAction` (`action`, optional `amount`). Returns next `TradingObservation`. |
+| `GET /state` | Side-effect-free snapshot (`TradingState`: cash, holdings, PV, step, transaction cost). |
+
+Remote clients should use **HTTP only** (`client.TradingEnv`); do not import `server.trading_environment` in agent code.
+
 ---
 
 ## 📊 2. Feature Specification (What the Agent Sees)

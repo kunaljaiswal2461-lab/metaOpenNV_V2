@@ -62,8 +62,50 @@ Single place for reviewers (mirrored in [`docs/MATERIALS.md`](docs/MATERIALS.md)
 
 ---
 
+## Phase 2: OpenEnv API contract
+
+Aligned with hackathon engineering expectations (Gym-style loop, client/server split, manifest routes).
+
+### Client vs server
+
+| Layer | Rule |
+| :--- | :--- |
+| **Remote agent / judge client** | Use **`client.TradingEnv`** only: `requests` to **`/reset`**, **`/step`**, **`/state`**. Do **not** `import server` or `TradingEnvironment` in agent/inference code. |
+| **Server** | `server/app.py` owns the `TradingEnvironment` singleton and exposes REST. |
+| **Local RL trainer** | `training/train.py` may import `TradingEnvironment` directly for speed; this is **not** a remote-client pattern (called out in that file’s docstring). |
+
+### HTTP routes (`openenv.yaml` `entrypoint.http.route`)
+
+| Method | Path | Body | Returns |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/reset` | Optional JSON `{"task_name": "spy_trading" \| "risk_aware_trading" \| "multi_horizon_trading"}` | `TradingObservation` |
+| `POST` | `/step` | `{"action": 0\|1\|2, "amount": 0.0–1.0}` (default `amount=1.0`) | `TradingObservation` |
+| `GET` | `/state` | — | `TradingState` (portfolio, step, `INITIAL_CASH`, `TRANSACTION_COST`) |
+
+**Episode loop:** `reset` → repeat `step` until `done` on observation; call `state` anytime for a side-effect-free snapshot.
+
+**Observation size:** `len(market_features) + 3` = `WINDOW_SIZE × 10 + 3` (see Phase 1 / `openenv.yaml`).
+
+**MCP / tools:** Do not register custom tools named `reset`, `step`, `state`, or `close` — those names are reserved for the environment API.
+
+### Verify client-only wiring
+
+With the API running (`python server/app.py`):
+
+```bash
+python verify_shape.py
+```
+
+Static checks (no server):
+
+```bash
+python -m pytest tests/test_env.py -q
+```
+
+---
+
 ## 🧭 SYSTEM NAVIGATION
-[Phase 1](#phase-1-judge-materials) | [🏠 Overview](#-getting-started) | [⚙️ Specifications](#-environment-specification) | [📉 Market Dynamics](#-data--market-dynamics) | [🎯 Scoring](#-tasks--scoring) | [🤖 Agent Loop](#-agent--api) | [📁 Structure](#-file-structure)
+[Phase 1](#phase-1-judge-materials) | [Phase 2](#phase-2-openenv-api-contract) | [🏠 Overview](#-getting-started) | [⚙️ Specifications](#-environment-specification) | [📉 Market Dynamics](#-data--market-dynamics) | [🎯 Scoring](#-tasks--scoring) | [🤖 Agent Loop](#-agent--api) | [📁 Structure](#-file-structure)
 
 ---
 
@@ -154,9 +196,10 @@ The baseline `inference.py` follows a strict logic loop:
 3. **Decision**: The model consumes the full observation vector (length depends on `WINDOW_SIZE`) and outputs a discrete action.
 
 ### 📡 API Architecture
-The Space exposes a standard REST interface for remote agent connectivity:
+The Space exposes a standard REST interface for remote agent connectivity (see **Phase 2** for the full contract):
 - `POST /reset`: Initialize a new episode. Optional JSON body: `{"task_name":"spy_trading"}` or `"risk_aware_trading"` or `"multi_horizon_trading"` (matches `openenv.yaml` tasks and sets the lookback window).
 - `POST /step`: Execute action and return MDP state (JSON body: `TradingAction` — `action` 0/1/2, optional `amount` 0–1).
+- `GET /state`: Read portfolio and metadata without advancing the simulator.
 
 ---
 

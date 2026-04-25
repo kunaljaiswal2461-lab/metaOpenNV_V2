@@ -2,7 +2,7 @@ spec_version: 1
 name: trading-env
 version: 0.1.0
 description: >
-  RL Financial Market Simulator: trade SPY via OpenEnv-style REST (POST /reset, POST /step).
+  RL Financial Market Simulator: trade SPY via OpenEnv-style REST (POST /reset, POST /step, GET /state).
   There are 10 engineered market features per bar. JSON observations use market_features
   length WINDOW_SIZE*10 plus three portfolio fields; total flattened size is WINDOW_SIZE*10+3.
   Task presets set WINDOW_SIZE to 10, 20, or 50 (103 / 203 / 503). Default Space build uses
@@ -28,7 +28,7 @@ tasks:
 entrypoint:
   type: rest_api
   http:
-    route: /reset, /step
+    route: /reset, /step, /state
 observation_space:
   type: continuous
   # Canonical default for Space (WINDOW_SIZE=20, 10 features/bar + 3 portfolio).

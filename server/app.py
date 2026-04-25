@@ -5,7 +5,7 @@ import uvicorn
 import gradio as gr
 import pandas as pd
 import os
-from models import TradingAction, TradingObservation
+from models import TradingAction, TradingObservation, TradingState
 
 # 1. Initialize FastAPI
 app = FastAPI(title="SPY RL Environment API")
@@ -52,6 +52,12 @@ async def reset(request: Request):
 @app.post("/step", response_model=TradingObservation)
 def step(action: TradingAction):
     return get_env().step(action)
+
+
+@app.get("/state", response_model=TradingState)
+def state():
+    """Gym-style environment state (no side effects). Remote clients use HTTP only."""
+    return get_env().state()
 
 # --- PASSIVE MONITOR LOGIC ---
 _pv_data = pd.DataFrame({"Minute": [0], "Portfolio Value": [10000.0]})

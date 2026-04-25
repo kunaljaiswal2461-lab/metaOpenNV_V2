@@ -4,6 +4,7 @@ Hackathon rules ask for **URLs**, not large binaries in the Space repo. Add ever
 
 | Kind | URL | Status |
 | :--- | :--- | :--- |
+| OpenEnv API contract (README Phase 2) | *in-repo* [`README.md`](../README.md#phase-2-openenv-api-contract) | Live |
 | Hugging Face Space | https://huggingface.co/spaces/Kj2461/metaOpenNV_V2 | Live |
 | Source (GitHub) | https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2 | Live |
 | Training Colab (Unsloth or TRL) | *add in Phase 3* | TBD |

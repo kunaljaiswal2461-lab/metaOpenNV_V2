@@ -1,14 +1,44 @@
-import sys
-from server.trading_environment import TradingEnvironment
-from client import TradingEnv
-from models import TradingObservation
+"""
+Verify flattened observation shape via the HTTP client only (no server imports).
 
-env = TradingEnvironment()
-obs = env.reset()
+Requires a running API: `python server/app.py` or set SPACE_URL to your Space.
+"""
+import sys
 
 import numpy as np
-arr = np.array(obs.market_features + [obs.port_cash, obs.holdings, obs.port_val], dtype=np.float32)
-expected_size = env.window * len(env.feat) + 3
-print('Array shape:', arr.shape)
-print(f'Expected:   ({expected_size},)')
-print('Match:', arr.shape == (expected_size,))
+
+from client import TradingEnv
+
+# Expected (window × 10 market features) + 3 portfolio scalars
+_EXPECTED = {
+    "spy_trading": 10 * 10 + 3,
+    "risk_aware_trading": 20 * 10 + 3,
+    "multi_horizon_trading": 50 * 10 + 3,
+}
+
+
+def main() -> None:
+    env = TradingEnv()
+    for task, expected in _EXPECTED.items():
+        try:
+            obs = env.reset(task_name=task)
+        except Exception as exc:
+            print(
+                "Connection failed — start the server "
+                "(e.g. `python server/app.py`) or set SPACE_URL.\n",
+                exc,
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        arr = env.obs_to_array(obs)
+        ok = arr.shape == (expected,) and len(obs.market_features) + 3 == expected
+        print(f"task={task!r} shape={arr.shape} expected=({expected},) match={ok}")
+        if not ok:
+            sys.exit(1)
+    st = env.state()
+    print("state():", st.model_dump())
+    print("OK: client-only shape checks passed")
+
+
+if __name__ == "__main__":
+    main()

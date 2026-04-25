@@ -22,11 +22,17 @@ class TradingEnv:
         self.obs = TradingObservation(**res.json())
         return self.obs
 
-    def step(self, action: int):
-        act = TradingAction(action=action)
+    def step(self, action: int, amount: float = 1.0):
+        act = TradingAction(action=action, amount=amount)
         res = self.session.post(f"{self.base_url}/step", json=act.model_dump())
         self.obs = TradingObservation(**res.json())
         return self.obs
+
+    def state(self) -> TradingState:
+        """Read-only MDP state (portfolio, step, costs). Does not advance the episode."""
+        res = self.session.get(f"{self.base_url}/state")
+        res.raise_for_status()
+        return TradingState(**res.json())
 
     def obs_to_array(self, obs: TradingObservation) -> np.ndarray:
         return np.array(

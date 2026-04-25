@@ -1,6 +1,11 @@
 """
 training/train.py — DQN training loop for the SPY trading agent.
 
+**OpenEnv client/server note:** Remote agents and judge-facing demos must use
+`client.TradingEnv` (HTTP to `/reset`, `/step`, `/state` only). This file imports
+`TradingEnvironment` directly for fast local RL; that is intentional for the
+training job, not a pattern for production clients.
+
 Usage:
     python -m training.train                     # 300 episodes (default)
     python -m training.train --episodes 10       # quick smoke test
