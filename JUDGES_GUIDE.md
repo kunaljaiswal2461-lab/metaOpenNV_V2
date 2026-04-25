@@ -1,79 +1,148 @@
-# ⚖️ Judges' Guide: Grok-Agent SPY Trading Environment
+# Judges' Guide — SPY OpenEnv Trading Environment
 
-This document provides a deep technical breakdown of the Reinforcement Learning environment and the Grok-powered Agentic workflow for the Meta Hackathon judges.
+This is the technical companion to [`README.md`](README.md). The README owns the
+single-source-of-truth scope (Phase 0), judging materials (Phase 1), and the API
+contract (Phase 2). This file gives a deeper engineering walk-through.
+
+> Single source of truth for thesis & artifacts: `README.md`. If anything below
+> conflicts with `README.md`, the README wins.
 
 ---
 
-## 🏗️ 1. Environment Workflow (The Engine)
+## 1. Environment workflow (the engine)
 
-The environment is a high-fidelity simulator for the **SPY (S&P 500 ETF)**. It follows a standard OpenAI Gym-style interaction loop but is optimized for LLM agents.
-
-### The Loop:
-1.  **Observation**: A flattened vector of length **`WINDOW_SIZE × 10 + 3`**. Default Hugging Face Space uses `WINDOW_SIZE=20` → **203** dimensions (200 market + 3 portfolio). Task presets (`spy_trading`, `risk_aware_trading`, `multi_horizon_trading`) map to windows **10 / 20 / 50** → **103 / 203 / 503** when `task_name` is sent on `POST /reset` (JSON body) or `WINDOW_SIZE` is set in the environment.
-2.  **Inference**: An AI Agent (Grok-2 or GPT-4o-mini) processes this state.
-3.  **Action**: The Agent returns a discrete action: `0 (HOLD)`, `1 (BUY)`, or `2 (SELL)`.
-4.  **State Update**: The environment executes the trade, calculates transaction costs (0.1%), updates the Portfolio Value (PV), and computes the Reward.
-5.  **Termination**: The session ends if portfolio value falls below **40%** of initial capital, the sampled episode segment ends, or the data sequence concludes.
+1. **Observation.** A flattened vector of length **`WINDOW_SIZE × 10 + 3`**.
+   Default Hugging Face Space uses `WINDOW_SIZE=20` → **203 dims**
+   (200 market + 3 portfolio). Tasks `spy_trading | risk_aware_trading |
+   multi_horizon_trading` map to windows **10 / 20 / 50** → **103 / 203 / 503**
+   when `task_name` is sent on `POST /reset` or `WINDOW_SIZE` is set in the
+   environment.
+2. **Action.** Discrete `0=HOLD`, `1=BUY`, `2=SELL` with optional `amount`
+   (0–1, default 1.0).
+3. **State update.** Trade executes at next close; **0.1%** transaction cost on
+   buy/sell; portfolio value, cash, holdings updated.
+4. **Termination.** Episode ends when portfolio value falls below **40%** of
+   initial cash, the sampled segment ends, or the data sequence is exhausted.
 
 ### REST surface (OpenEnv-style)
 
 | Endpoint | Role |
 | :--- | :--- |
-| `POST /reset` | Start or restart an episode; optional `{"task_name": "..."}` selects curriculum window (10 / 20 / 50 bars). |
-| `POST /step` | Apply `TradingAction` (`action`, optional `amount`). Returns next `TradingObservation`. |
+| `POST /reset` | Start or restart an episode. Optional JSON body: `{"task_name": "..."}` selects a curriculum window. |
+| `POST /step` | Apply `TradingAction`. Returns next `TradingObservation`. |
 | `GET /state` | Side-effect-free snapshot (`TradingState`: cash, holdings, PV, step, transaction cost). |
 
-Remote clients should use **HTTP only** (`client.TradingEnv`); do not import `server.trading_environment` in agent code.
+Remote agents (and judges) should use **HTTP only** via
+[`client.TradingEnv`](client.py). `server.trading_environment` is reserved for
+local RL training and tests; do not import it in agent code.
 
 ---
 
-## 📊 2. Feature Specification (What the Agent Sees)
+## 2. Feature specification (what the agent sees)
 
-The agent receives a **rolling window** of **10** engineered features per bar (past `WINDOW_SIZE` bars, exclusive of the current bar in the stacked slice used for history — see `server/trading_environment.py`), plus **3** portfolio scalars.
+10 engineered features per bar over the rolling window, plus 3 portfolio
+scalars. Implementation in [`data/preprocess.py`](data/preprocess.py).
 
-### Technical Indicators Explained:
-
-| Indicator | Technical Formula | Purpose |
+| Indicator | Formula | Purpose |
 | :--- | :--- | :--- |
-| **Log Return** | `ln(Price_t / Price_{t-1})` | Captures price momentum and volatility in a stationary format. |
-| **SMA 5 Dist** | `(Price - SMA_5) / SMA_5` | Measures short-term overextension (Mean Reversion). |
-| **SMA 20 Dist** | `(Price - SMA_20) / SMA_20` | Measures medium-term trend strength (Trend Following). |
-| **RSI (14)** | `100 - [100 / (1 + RS)]` | Standard 14-period momentum oscillator (Normalized to 0-1). |
-| **Norm Volume** | `Vol / SMA_20(Vol)` | Identifies high-conviction moves relative to recent activity. |
-| **Volatility** | `StdDev(Log_Returns, 10)` | Captures market uncertainty and risk (10-period rolling). |
-| **VWAP distance** | `(Price - VWAP) / VWAP` | Distance from cumulative typical-price VWAP (daily series on daily bars). |
-| **EMA12 distance** | `(Price - EMA_12) / EMA_12` | Short-horizon trend alignment. |
-| **MACD − signal** | `MACD_hist / Price` | Momentum vs signal line, price-normalized. |
-| **ATR%** | `ATR(14) / Price` | Regime / volatility scaling. |
+| Log return | `ln(P_t / P_{t-1})` | Price momentum, scale-free. |
+| SMA-5 distance | `(P − SMA5) / SMA5` | Short-term mean reversion. |
+| SMA-20 distance | `(P − SMA20) / SMA20` | Medium-term trend strength. |
+| RSI(14) | 14-period RSI normalized 0–1 | Momentum oscillator. |
+| Norm volume | `V / SMA20(V)` | Conviction of moves. |
+| Volatility | `StdDev(log_ret, 10)` | Risk regime. |
+| VWAP distance | `(P − VWAP) / VWAP` | Position vs cumulative typical-price VWAP. |
+| EMA-12 distance | `(P − EMA12) / EMA12` | Short-horizon trend alignment. |
+| MACD − signal | `MACD_hist / P` | Momentum vs signal line. |
+| ATR% | `ATR(14) / P` | Volatility-regime scaling. |
 
-**Portfolio Features:**
-- `port_cash`: Liquidity available for buying.
-- `holdings`: Current quantity of SPY shares owned.
-- `port_val`: Total net worth (Cash + Holdings * Price).
+Portfolio: `port_cash` (USD), `holdings` (shares), `port_val` (USD).
 
 ---
 
-## 🧠 3. Agentic Workflow (Grok Integration)
+## 3. Baselines and trained agents (what we shipped)
 
-The "Agentic" part of this project goes beyond simple classification. We use **Tool Interception** to let Grok bridge the gap between "Thinking" and "Acting."
+The story for judges is *"on the same env physics, multiple baselines plus a
+trained agent — and a trained LLM — are compared, with regenerable plots."*
 
-1.  **System Consciousness**: We provide Grok with a "Trading Persona" and a JSON description of the tools available.
-2.  **Reasoning Step**: Grok analyzes the observation. Instead of just outputting an action, it can **call internal tools** to fetch deeper data or execute complex orders.
-3.  **Action Interception**:
-    - Grok outputs a `tool_call` (e.g., `execute_trade(action='BUY', quantity=10)`).
-    - Our Python backend intercepts this "intent."
-    - The backend interacts with the Environment API.
-    - The result (Success/Failure) is fed back into Grok's memory before the next decision.
+### 3.1 Phase 4 (RL + heuristic baselines, in-repo eval)
+
+Driver: [`eval/phase4_benchmark.py`](eval/phase4_benchmark.py). Outputs:
+[`results/phase4_episode_return.png`](results/phase4_episode_return.png),
+[`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png),
+[`results/phase4_metrics.md`](results/phase4_metrics.md).
+
+| Policy | Definition |
+| :--- | :--- |
+| `random` | Uniform over {HOLD, BUY, SELL}. |
+| `always_hold` | Cash baseline. |
+| `buy_once_then_hold` | Buy on step 1, hold thereafter. |
+| `sma20_trend` | Buy if `sma20_dist > 0`, sell if `< −0.02`, else HOLD. |
+| `DQN (greedy)` | Tiny PyTorch DQN trained briefly on the same env (`agent/dqn_agent.py`). |
+
+Regenerate: `python -m eval.phase4_benchmark` (use `--train-episodes 120 --eval-episodes 30` for a longer DQN narrative).
+
+### 3.2 Remote-LLM baseline ([`inference.py`](inference.py))
+
+Calls an OpenAI-compatible chat endpoint (`MODEL_NAME`, default
+`gpt-4o-mini`). It is a **remote-API baseline**, not the Phase 3 trained agent.
+This file demonstrates that the env is callable from any LLM behind an
+OpenAI-style API — judges can swap `MODEL_NAME` and `API_BASE_URL`.
+
+### 3.3 Phase 3 — TRL supervised fine-tuning (judging-grade)
+
+Pipeline (see README **Phase 3**):
+
+1. [`scripts/collect_sft_dataset.py`](scripts/collect_sft_dataset.py) — rolls
+   trajectories via HTTP `client.TradingEnv` (or `--local` for dev), labels
+   each step with the **SMA20-distance teacher** in
+   [`trl_data/prompt_utils.py`](trl_data/prompt_utils.py), writes
+   `data/trl_sft_train.jsonl`.
+2. [`scripts/trl_sft_train.py`](scripts/trl_sft_train.py) — TRL `SFTTrainer`
+   on the JSONL `text` field. Default model
+   `Qwen/Qwen2.5-0.5B-Instruct`; on CPU you can pass
+   `--model-id distilgpt2 --no-gradient-checkpointing` for a smoke run.
+   Outputs `results/trl_sft_loss.png` and an adapter directory.
+3. Re-run via [`colab/phase3_trl_sft.ipynb`](colab/phase3_trl_sft.ipynb)
+   ([Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb)).
+
+### 3.4 Stretch — bigger model on Colab (optional)
+
+Same pipeline with `--model-id Qwen/Qwen2.5-3B-Instruct` and 4-bit + LoRA on
+Colab L4/A100 (described in README **Phase 3** under the Colab notebook). This
+is optional for v1 and not required for judging.
 
 ---
 
-## 🧪 4. Evaluation Metrics for Judges
+## 4. Evaluation metrics for judges
 
-When reviewing the Live Dashboard or logs, watch for:
-- **Sharpe Ratio**: Reward vs. Volatility.
-- **Max Drawdown**: How well the agent manages risk during market dips.
-- **RSI Adherence**: Does the agent buy low (RSI < 0.3) and sell high (RSI > 0.7)?
-- **Portfolio Growth**: Net profit relative to a "Buy and Hold" strategy.
+When reviewing the live dashboard, `inference.py` logs, or
+`results/phase4_metrics.md`, watch for:
+
+- **Mean episode reward** vs `always_hold` / `buy_once_then_hold` (cash and
+  trend baselines).
+- **Action distribution** — does the agent actually trade, or only HOLD?
+- **Drawdown / liquidation** — termination at `< 40%` of initial capital.
+- **Teacher-agreement rate** — fraction of steps where the agent matches
+  `sma20_trend` (sanity check that SFT actually moved the model).
+
+Phase 4 provides the regenerable bar/line plots; Phase 3 provides
+`results/trl_sft_loss.png` (and, if added, a base-vs-fine-tuned bar).
 
 ---
-*Environment: RL-Trading-v1 | Backend: Grok-2-Latest | Deployment: HF Spaces*
+
+## 5. Reproducibility checklist
+
+- **Space:** https://huggingface.co/spaces/Kj2461/metaOpenNV_V2 (rebuild on
+  the submission commit before judging).
+- **GitHub:** https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2.
+- **Manifest:** [`openenv.yaml`](openenv.yaml) (`shape: [203]` matches
+  default `WINDOW_SIZE=20`).
+- **Tests:** `python -m pytest tests/test_env.py -q` (static),
+  `python verify_shape.py` (HTTP smoke after `python server/app.py`).
+- **Phase 4 eval:** `python -m eval.phase4_benchmark`.
+- **Phase 3 SFT:** see README Phase 3 or the Colab.
+
+---
+
+*Environment: SPY OpenEnv | Default model: `Qwen/Qwen2.5-0.5B-Instruct` (TRL SFT) | Optional remote-LLM baseline: OpenAI-compatible API via `inference.py` | Deployment: Hugging Face Spaces (Docker SDK)*
