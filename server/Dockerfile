@@ -18,6 +18,7 @@ COPY . .
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+ENV WINDOW_SIZE=20
 
 # Expose the Hugging Face Space port
 EXPOSE 7860

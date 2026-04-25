@@ -11,8 +11,14 @@ class TradingEnv:
         self.obs = None
         self.session = requests.Session()
 
-    def reset(self, **kwargs):
-        res = self.session.post(f"{self.base_url}/reset")
+    def reset(self, task_name=None, **kwargs):
+        payload = {}
+        if task_name is not None:
+            payload["task_name"] = task_name
+        res = self.session.post(
+            f"{self.base_url}/reset",
+            json=payload if payload else {},
+        )
         self.obs = TradingObservation(**res.json())
         return self.obs
 

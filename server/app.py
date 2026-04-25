@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Lazy singleton
+# Lazy singleton (WINDOW_SIZE env matches openenv.yaml task presets when set)
 _env = None
 def get_env():
     global _env
@@ -39,8 +39,15 @@ def health():
 
 # --- API ROUTES ---
 @app.post("/reset", response_model=TradingObservation)
-def reset():
-    return get_env().reset()
+async def reset(request: Request):
+    task_name = None
+    try:
+        body = await request.json()
+        if isinstance(body, dict) and body.get("task_name"):
+            task_name = str(body["task_name"])
+    except Exception:
+        pass
+    return get_env().reset(task_name=task_name)
 
 @app.post("/step", response_model=TradingObservation)
 def step(action: TradingAction):
@@ -57,9 +64,10 @@ def get_live_state():
     
     global _pv_data, _price_data
     # Safe minute calculation
-    cur_min = max(0, obs.current_step - 20)
-    
-    if obs.current_step <= 21: # RESET
+    w = int(getattr(env, "window", 20))
+    cur_min = max(0, obs.current_step - w)
+
+    if obs.current_step <= w + 1:  # RESET
         _pv_data = pd.DataFrame({"Minute": [0], "Portfolio Value": [obs.port_val]})
         _price_data = pd.DataFrame({"Minute": [0], "SPY Price": [obs.close_price]})
     else:
@@ -282,12 +290,12 @@ with gr.Blocks() as demo:
                             </ul>
                         </div>
                         <div class="feature-card">
-                            <h3>🧩 Observation Logic (123-D)</h3>
-                            <p>Flattened temporal hierarchy capturing momentum trajectories.</p>
+                            <h3>🧩 Observation Logic (window × 10 + 3)</h3>
+                            <p>Flattened temporal hierarchy: last <code>WINDOW_SIZE</code> bars of 10 engineered features, plus 3 portfolio scalars.</p>
                             <ul>
-                                <li><b>Lookback Window:</b> 20 minutes (T-0 to T-19).</li>
-                                <li><b>Feature Flattening:</b> 20 steps × 6 Indicators = 120 features.</li>
-                                <li><b>Meta-Features:</b> 3 real-time account state dimensions.</li>
+                                <li><b>Default Space:</b> <code>WINDOW_SIZE=20</code> → 203 dimensions (200 market + 3 portfolio).</li>
+                                <li><b>Tasks:</b> <code>spy_trading</code>=10, <code>risk_aware_trading</code>=20, <code>multi_horizon_trading</code>=50 (via <code>POST /reset</code> JSON <code>task_name</code>).</li>
+                                <li><b>Features:</b> log return, SMA distances, RSI, norm volume, volatility, VWAP distance, EMA12 distance, MACD vs signal, ATR%.</li>
                             </ul>
                         </div>
                     </div>
@@ -331,6 +339,26 @@ with gr.Blocks() as demo:
                                 <td><b>Volatility</b></td>
                                 <td><code>StdDev(Log_Ret, 10)</code></td>
                                 <td>Risk signal representing market uncertainty.</td>
+                            </tr>
+                            <tr>
+                                <td><b>VWAP distance</b></td>
+                                <td><code>(P - VWAP) / VWAP</code></td>
+                                <td>Intraday fair-value anchor (cumulative typical price × volume).</td>
+                            </tr>
+                            <tr>
+                                <td><b>EMA12 distance</b></td>
+                                <td><code>(P - EMA_12) / EMA_12</code></td>
+                                <td>Short-horizon trend alignment.</td>
+                            </tr>
+                            <tr>
+                                <td><b>MACD − signal</b></td>
+                                <td><code>MACD_hist / P</code></td>
+                                <td>Momentum vs signal line, price-normalized.</td>
+                            </tr>
+                            <tr>
+                                <td><b>ATR%</b></td>
+                                <td><code>ATR(14) / P</code></td>
+                                <td>Regime / risk scaling.</td>
                             </tr>
                         </tbody>
                     </table>

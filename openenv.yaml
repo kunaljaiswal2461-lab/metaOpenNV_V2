@@ -2,8 +2,13 @@ spec_version: 1
 name: trading-env
 version: 0.1.0
 description: >
-  RL Financial Market Simulator. Trade SPY to maximize profit.
-  Actions: 0=HOLD, 1=BUY, 2=SELL
+  RL Financial Market Simulator: trade SPY via OpenEnv-style REST (POST /reset, POST /step).
+  There are 10 engineered market features per bar. JSON observations use market_features
+  length WINDOW_SIZE*10 plus three portfolio fields; total flattened size is WINDOW_SIZE*10+3.
+  Task presets set WINDOW_SIZE to 10, 20, or 50 (103 / 203 / 503). Default Space build uses
+  WINDOW_SIZE=20 (203).
+  Optional JSON body for reset: {"task_name":"spy_trading"|"risk_aware_trading"|"multi_horizon_trading"}.
+  Actions: 0=HOLD, 1=BUY, 2=SELL.
 server:
   type: docker
   build: ./server/Dockerfile
@@ -26,6 +31,7 @@ entrypoint:
     route: /reset, /step
 observation_space:
   type: continuous
+  # Canonical default for Space (WINDOW_SIZE=20, 10 features/bar + 3 portfolio).
   shape: [203]
 action:
   type: discrete

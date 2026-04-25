@@ -291,17 +291,17 @@ DASHBOARD_HTML = """
 
             <div class="doc-cards">
                 <div class="stat-card"><span class="stat-value">3</span><span class="stat-label">Base Actions</span></div>
-                <div class="stat-card"><span class="stat-value">123 dims</span><span class="stat-label">Observation Size</span></div>
-                <div class="stat-card"><span class="stat-value">20-Step</span><span class="stat-label">Temporal Window</span></div>
+                <div class="stat-card"><span class="stat-value">203 dims</span><span class="stat-label">Observation (default)</span></div>
+                <div class="stat-card"><span class="stat-value">20-bar</span><span class="stat-label">Default window</span></div>
             </div>
 
             <h3>2. Observation Space Deep-Dive</h3>
-            <p>The agent receives a flattened vector of <b>123 values</b> every step. This captures the <i>momentum trajectory</i> of the market.</p>
+            <p>Default Space: <b>203 values</b> per step (<code>WINDOW_SIZE=20</code> × 10 features + 3 portfolio). Tasks can use 10- or 50-bar windows → 103 or 503 dims.</p>
             <table class="doc-table">
-                <thead><tr><th>Feature Layer</th><th>Dimensions</th><th>Description</th></tr></thead>
+                <thead><tr><th>Feature Layer</th><th>Dimensions (default)</th><th>Description</th></tr></thead>
                 <tbody>
-                    <tr><td>Market Features</td><td>120</td><td>Current + 19 past steps across 6 technical indicators.</td></tr>
-                    <tr><td>Portfolio Stats</td><td>3</td><td>Normalized Cash, Holdings, and Net Portfolio Value ($).</td></tr>
+                    <tr><td>Market Features</td><td>200</td><td>20 past bars × 10 indicators (see README + <code>data/preprocess.py</code>).</td></tr>
+                    <tr><td>Portfolio Stats</td><td>3</td><td>Cash, holdings (shares), portfolio value ($).</td></tr>
                 </tbody>
             </table>
 

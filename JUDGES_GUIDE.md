@@ -9,17 +9,17 @@ This document provides a deep technical breakdown of the Reinforcement Learning 
 The environment is a high-fidelity simulator for the **SPY (S&P 500 ETF)**. It follows a standard OpenAI Gym-style interaction loop but is optimized for LLM agents.
 
 ### The Loop:
-1.  **Observation**: The environment provides a 123-dimensional vector (or JSON equivalent) containing the last 20 minutes of market data and current portfolio state.
+1.  **Observation**: A flattened vector of length **`WINDOW_SIZE × 10 + 3`**. Default Hugging Face Space uses `WINDOW_SIZE=20` → **203** dimensions (200 market + 3 portfolio). Task presets (`spy_trading`, `risk_aware_trading`, `multi_horizon_trading`) map to windows **10 / 20 / 50** → **103 / 203 / 503** when `task_name` is sent on `POST /reset` (JSON body) or `WINDOW_SIZE` is set in the environment.
 2.  **Inference**: An AI Agent (Grok-2 or GPT-4o-mini) processes this state.
 3.  **Action**: The Agent returns a discrete action: `0 (HOLD)`, `1 (BUY)`, or `2 (SELL)`.
 4.  **State Update**: The environment executes the trade, calculates transaction costs (0.1%), updates the Portfolio Value (PV), and computes the Reward.
-5.  **Termination**: The session ends if 60% of capital is lost or the data sequence concludes.
+5.  **Termination**: The session ends if portfolio value falls below **40%** of initial capital, the sampled episode segment ends, or the data sequence concludes.
 
 ---
 
 ## 📊 2. Feature Specification (What the Agent Sees)
 
-The agent receives a **20-step rolling window** of the following 6 technical indicators, totaling 120 market features + 3 portfolio features.
+The agent receives a **rolling window** of **10** engineered features per bar (past `WINDOW_SIZE` bars, exclusive of the current bar in the stacked slice used for history — see `server/trading_environment.py`), plus **3** portfolio scalars.
 
 ### Technical Indicators Explained:
 
@@ -31,6 +31,10 @@ The agent receives a **20-step rolling window** of the following 6 technical ind
 | **RSI (14)** | `100 - [100 / (1 + RS)]` | Standard 14-period momentum oscillator (Normalized to 0-1). |
 | **Norm Volume** | `Vol / SMA_20(Vol)` | Identifies high-conviction moves relative to recent activity. |
 | **Volatility** | `StdDev(Log_Returns, 10)` | Captures market uncertainty and risk (10-period rolling). |
+| **VWAP distance** | `(Price - VWAP) / VWAP` | Distance from cumulative typical-price VWAP (daily series on daily bars). |
+| **EMA12 distance** | `(Price - EMA_12) / EMA_12` | Short-horizon trend alignment. |
+| **MACD − signal** | `MACD_hist / Price` | Momentum vs signal line, price-normalized. |
+| **ATR%** | `ATR(14) / Price` | Regime / volatility scaling. |
 
 **Portfolio Features:**
 - `port_cash`: Liquidity available for buying.

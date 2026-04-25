@@ -18,6 +18,8 @@ COPY . .
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+# Aligns with openenv task risk_aware_trading (20-bar window → 203-dim vector).
+ENV WINDOW_SIZE=20
 
 # Expose the Hugging Face Space port
 EXPOSE 7860

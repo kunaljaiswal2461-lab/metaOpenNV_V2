@@ -17,6 +17,14 @@ from models import TradingAction, TradingObservation, TradingState
 from reward import RewardCalculator
 from data.preprocess import load_and_preprocess
 
+# Maps openenv.yaml task names to lookback window length (minutes of history).
+_TASK_WINDOWS = {
+    "spy_trading": 10,
+    "risk_aware_trading": 20,
+    "multi_horizon_trading": 50,
+}
+
+
 def sanitize_value(val):
     """Deep cleaning of values to ensure JSON compliance for OpenAI."""
     try:
@@ -31,7 +39,7 @@ def sanitize_value(val):
 class TradingEnvironment(Environment):
     def __init__(
         self,
-        window=20,
+        window=None,
         initial_capital=10000.0,
         cost=0.001,
         random_episode_start=True,
@@ -44,7 +52,10 @@ class TradingEnvironment(Environment):
         
         train_df, _ = load_and_preprocess(csv_path)
         self.df = train_df.reset_index(drop=True)
-        self.window = window
+        if window is None:
+            window = int(os.environ.get("WINDOW_SIZE", "20"))
+        self._default_window = int(window)
+        self.window = self._default_window
         self.initial_cash = initial_capital
         self.cost = cost
         self.random_episode_start = random_episode_start
@@ -79,6 +90,10 @@ class TradingEnvironment(Environment):
         return min(len(self.df) - 1, start_step + self.episode_length)
 
     def reset(self, task_name=None) -> TradingObservation:
+        if task_name and task_name in _TASK_WINDOWS:
+            self.window = _TASK_WINDOWS[task_name]
+        else:
+            self.window = self._default_window
         self._reset_state()
         return self._get_obs(reward=0.0, done=False)
 
