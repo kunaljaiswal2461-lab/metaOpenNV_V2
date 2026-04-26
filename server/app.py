@@ -505,14 +505,59 @@ def run_episode(
             time.sleep(speed)
 
 
+def _coerce_df(value, default_factory):
+    """Normalize Gradio component values back to a pandas DataFrame.
+
+    Gradio passes LinePlot/Dataframe values back to Python as either a
+    ``pd.DataFrame`` or a ``{"headers": [...], "data": [[...]]}`` dict
+    depending on version. This helper hides that asymmetry so callers can
+    always operate on a DataFrame.
+    """
+    if value is None:
+        return default_factory()
+    if isinstance(value, pd.DataFrame):
+        return default_factory() if value.empty else value
+    if isinstance(value, dict):
+        headers = value.get("headers") or value.get("columns")
+        data = value.get("data") or value.get("value")
+        if headers and data is not None:
+            try:
+                df = pd.DataFrame(data, columns=headers)
+                return default_factory() if df.empty else df
+            except Exception:
+                return default_factory()
+        return default_factory()
+    if isinstance(value, list):
+        try:
+            df = pd.DataFrame(value)
+            return default_factory() if df.empty else df
+        except Exception:
+            return default_factory()
+    return default_factory()
+
+
+def _coerce_float(value, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        s = value.strip().replace(",", "").replace("$", "").replace("+", "")
+        try:
+            return float(s) if s else default
+        except ValueError:
+            return default
+    return default
+
+
 def manual_step_action(
     action_idx: int,
     amount_pct: float,
-    pv_state: pd.DataFrame,
-    price_state: pd.DataFrame,
-    log_state: pd.DataFrame,
-    cum_reward_str: str,
-    trade_count: int,
+    pv_state,
+    price_state,
+    log_state,
+    cum_reward_str,
+    trade_count,
     regime: str,
 ):
     """Manual control pad: step the singleton env once and return a full UI refresh."""
@@ -521,14 +566,11 @@ def manual_step_action(
     window = int(env.window)
     step = int(obs.current_step) - window
 
-    if pv_state is None or pv_state.empty:
-        pv_state = _empty_pv_df()
-        price_state = _empty_price_df()
-        log_state = _empty_log_df()
-        cum_reward = 0.0
-        trade_count = 0
-    else:
-        cum_reward = float(cum_reward_str.replace(",", "")) if cum_reward_str else 0.0
+    pv_state = _coerce_df(pv_state, _empty_pv_df)
+    price_state = _coerce_df(price_state, _empty_price_df)
+    log_state = _coerce_df(log_state, _empty_log_df)
+    cum_reward = _coerce_float(cum_reward_str, 0.0)
+    trade_count = int(trade_count) if trade_count is not None else 0
 
     cum_reward += float(obs.reward)
     if int(action_idx) in (1, 2):
