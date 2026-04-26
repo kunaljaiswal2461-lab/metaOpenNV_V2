@@ -96,7 +96,11 @@ def main() -> None:
     p.add_argument("--collect-episodes", type=int, default=15)
     p.add_argument("--collect-max-steps", type=int, default=400)
     p.add_argument("--task-name", default="risk_aware_trading")
-    p.add_argument("--model-id", default="Qwen/Qwen2.5-0.5B-Instruct")
+    p.add_argument(
+        "--model-id",
+        default=os.environ.get("PHASE3_MODEL_ID", "Qwen/Qwen2.5-0.5B-Instruct"),
+        help="Base model id (env PHASE3_MODEL_ID overrides the CLI default).",
+    )
     p.add_argument("--epochs", type=int, default=1)
     p.add_argument("--output-dir", default=os.path.join("results", "phase3_lora"))
     p.add_argument("--skip-collect", action="store_true")
