@@ -59,7 +59,9 @@ Single place for reviewers (mirrored in [`docs/MATERIALS.md`](docs/MATERIALS.md)
 
 1. **Problem:** LLMs need grounded, multi-step **decisions under market friction**, not one-shot financial text.  
 2. **Environment:** SPY bars + engineered features + portfolio state; **reset/step** API; episode sampling over held-out-style train split.  
-3. **Results:** See **Phase 4 (Results)** below — committed reward curves and [`results/phase4_metrics.md`](results/phase4_metrics.md).  
+3. **Results:**
+   - **Phase 3 (LLM SFT closes the loop):** trained adapter [`Kj2461/metaOpenNV-sft-qwen15`](https://huggingface.co/Kj2461/metaOpenNV-sft-qwen15) lifts mean episode reward from **−0.04 → +1.84** and final portfolio value from **$10 000 → $10 719** vs the un-tuned base of the *same* Qwen 1.5B model on `risk_aware_trading` (10 ep × 300 steps). Teacher agreement doubles (0.20 → 0.40); action distribution shifts from 100% HOLD to 77/23/0 HOLD/BUY/SELL. Full table: [`results/phase3_eval_metrics.md`](results/phase3_eval_metrics.md), bar chart: [`results/phase3_eval_bar.png`](results/phase3_eval_bar.png).
+   - **Phase 4 (classical baselines):** committed reward curves and [`results/phase4_metrics.md`](results/phase4_metrics.md).
 4. **Why it matters:** Improves **tool-like control** and **long-horizon consistency** for professional / assistant-style agents (see Phase 0 themes).
 
 ---
@@ -151,10 +153,7 @@ The submission training was driven entirely from a second Hugging Face Space (`K
 
 **Closing the loop — base vs fine-tuned on the live env**
 
-Once an adapter exists, [`scripts/eval_llm_on_env.py`](scripts/eval_llm_on_env.py) plays N episodes for each model and writes:
-
-- [`results/phase3_eval_metrics.md`](results/phase3_eval_metrics.md) — per-model mean episode reward, std, last-PV, action distribution, teacher-agreement.
-- [`results/phase3_eval_bar.png`](results/phase3_eval_bar.png) — bar chart of mean episode reward.
+[`scripts/eval_llm_on_env.py`](scripts/eval_llm_on_env.py) auto-detects PEFT adapters: it reads `adapter_config.json`, loads the listed `base_model_name_or_path`, and applies `PeftModel.from_pretrained` on top. Pass either an HF repo id (e.g. `Kj2461/metaOpenNV-sft-qwen15`) or a local TRL output dir. For dev without a running Space, add **`--local`** (same physics as `collect_sft_dataset --local`). Qwen tokenizers need **`sentencepiece`** (listed in `requirements-trl.txt`).
 
 ```bash
 python scripts/eval_llm_on_env.py \
@@ -162,7 +161,23 @@ python scripts/eval_llm_on_env.py \
   --episodes 10 --max-steps 300 --task-name risk_aware_trading --local
 ```
 
-The eval script auto-detects PEFT adapters: it reads `adapter_config.json`, loads the listed `base_model_name_or_path`, and applies `PeftModel.from_pretrained` on top. Pass either an HF repo id (e.g. `Kj2461/metaOpenNV-sft-qwen15`) or a local TRL output dir. For dev without a running Space, add **`--local`** (same physics as `collect_sft_dataset --local`). Qwen tokenizers need **`sentencepiece`** (listed in `requirements-trl.txt`).
+**Submission run (10 episodes × 300 steps, `risk_aware_trading`, `--local`, T4-medium):**
+
+| Model | Mean episode reward | Std | Last final PV | HOLD | BUY | SELL | Teacher agreement |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| base (Qwen 1.5B Instruct, no SFT) | -0.0444 | 0.0000 | $10,000.00 | 100.0% | 0.0% | 0.0% | 0.201 |
+| **sft** (base + LoRA on env trajectories) | **+1.844** | 1.190 | **$10,718.64** | 77.2% | 22.6% | 0.1% | **0.401** |
+
+What changed after one epoch of SFT on 5,850 env rows:
+
+- **Reward**: base is stuck at the baseline penalty (it never trades); SFT lifts mean episode reward by **+1.89** with positive returns in 9/10 episodes (peak +3.87 reward / +31% PV).
+- **Action diversity**: base degenerates to 100% HOLD; SFT learns **77/23/0** HOLD/BUY/SELL — it actually deploys cash when the SMA20 / momentum signals line up.
+- **Teacher agreement**: jumps from **0.20 → 0.40** (2× the SMA20 trend teacher), even though the fine-tuned model is free to deviate from the teacher.
+- **Risk-side**: SFT shows higher variance than base (1.19 std vs 0.0) — that is the price of trading at all; one of 10 episodes ended below $10k. Track-H below addresses this with the richer prompt + composite teacher.
+
+Full table + bar chart auto-committed: [`results/phase3_eval_metrics.md`](results/phase3_eval_metrics.md), [`results/phase3_eval_bar.png`](results/phase3_eval_bar.png) (also mirrored on the model repo at `https://huggingface.co/Kj2461/metaOpenNV-sft-qwen15/tree/main/results`).
+
+![Phase 3 eval bar](results/phase3_eval_bar.png)
 
 **Track-H (richer prompt + bigger model, optional, paid GPU on HF or Colab):**
 
