@@ -192,6 +192,29 @@ python scripts/eval_llm_on_env.py --models sft_3b=results/phase3_lora_3b \
   --prompt full --history-len 5 --task-name multi_horizon_trading
 ```
 
+#### Track-M (Mixed-market SFT — SPY + Nifty 50 / RELIANCE.NS)
+
+The environment rotates datasets across `reset()` calls (SPY → Nifty 50 → SPY → …), so a single 30-episode collection produces a balanced 50/50 mix without any code changes. The repo ships a pre-collected, deterministic JSONL at [`data/trl_sft_train_mixed.jsonl`](data/trl_sft_train_mixed.jsonl) — 11,700 rows, 15 SPY + 15 Nifty 50 episodes — so the GPU Space can go straight to TRL SFT.
+
+To regenerate the JSONL locally:
+
+```bash
+python scripts/collect_sft_dataset.py --local --episodes 30 --max-steps 400 \
+  --task-name multi_horizon_trading --prompt compact --teacher sma20 \
+  --out data/trl_sft_train_mixed.jsonl
+# tail of stdout: "Episode dataset mix: nifty50=15, spy=15"
+```
+
+Run the actual fine-tune on the GPU training Space (`Kj2461/metaOpenNV_V2-train`):
+
+1. On the Space → **Settings → Variables and secrets**, set:
+   - `HF_TOKEN` (write scope) — secret
+   - `HF_HUB_MODEL_ID` = `Kj2461/metaOpenNV-sft-qwen15-mixed` — variable
+2. (Optional) override any baked default — the Dockerfile pre-sets `MODE=train`, `SKIP_COLLECT=1`, `DATA_OUT=data/trl_sft_train_mixed.jsonl`, `PHASE3_MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct`, `COLLECT_TASK_NAME=multi_horizon_trading`, `EPOCHS=1`.
+3. **Resume / restart** the Space. On boot the status page comes up immediately, then the foreground job runs TRL SFT against the committed mixed JSONL and pushes the LoRA adapter to your `HF_HUB_MODEL_ID`.
+
+Existing `Kj2461/metaOpenNV-sft-qwen15` (SPY-only) is kept intact — Track-M produces a sibling adapter so the original Phase-3 result remains reproducible.
+
 **Judges:** the live **Space** URL in Phase 1 is the runnable env; training is reproducible via **HF GPU Space** ([`docs/HF_GPU_TRAIN.md`](docs/HF_GPU_TRAIN.md)) or the optional Colab notebook.
 
 ---

@@ -123,9 +123,12 @@ def main() -> None:
         f"messages_format={args.messages_format}"
     )
 
+    dataset_counts: dict[str, int] = {}
     with open(args.out, "w", encoding="utf-8") as f:
         for ep in range(args.episodes):
             obs = reset_task()
+            ds_name = str(getattr(obs, "dataset", "spy") or "spy")
+            dataset_counts[ds_name] = dataset_counts.get(ds_name, 0) + 1
             history: deque[tuple[int, float]] = deque(maxlen=history_len) if history_len else deque(maxlen=0)
             steps = 0
             while not obs.done and steps < args.max_steps:
@@ -144,8 +147,13 @@ def main() -> None:
                 if history_len:
                     history.append((int(a), float(obs.reward)))
                 steps += 1
-            print(f"  episode {ep+1}/{args.episodes} steps={steps} total_rows={n_rows}")
+            print(
+                f"  episode {ep+1}/{args.episodes} dataset={ds_name} "
+                f"steps={steps} total_rows={n_rows}"
+            )
 
+    summary = ", ".join(f"{k}={v}" for k, v in sorted(dataset_counts.items())) or "n/a"
+    print(f"Episode dataset mix: {summary}")
     print(f"Wrote {n_rows} rows to {args.out}")
 
 

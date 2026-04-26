@@ -21,6 +21,23 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONUTF8=1
 ENV SPACE_URL=https://kj2461-metaopennv-v2.hf.space
 
+# ---- Mixed SPY + Nifty 50 SFT defaults (overridable via Space variables) ----
+# The repo ships a pre-collected, balanced 30-episode JSONL (15 SPY + 15
+# Nifty 50 / RELIANCE.NS) at data/trl_sft_train_mixed.jsonl. Skipping
+# collection means the Space goes straight to TRL SFT on a deterministic
+# dataset, so a single GPU boot ends in a pushable LoRA adapter quickly.
+# Override any of these on the Space's Variables/Secrets page.
+ENV MODE=train
+ENV SKIP_COLLECT=1
+ENV DATA_OUT=data/trl_sft_train_mixed.jsonl
+ENV PHASE3_MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct
+ENV COLLECT_TASK_NAME=multi_horizon_trading
+ENV COLLECT_PROMPT=compact
+ENV COLLECT_TEACHER=sma20
+ENV COLLECT_HISTORY_LEN=0
+ENV EPOCHS=1
+ENV MAX_LENGTH=512
+
 EXPOSE 7860
 
 CMD ["python", "scripts/hf_train_and_push.py"]

@@ -220,9 +220,13 @@ def main() -> None:
     )
     p.add_argument("--hub-model-id", default=None, help="Target Hub model repo (else env HF_HUB_MODEL_ID / HUB_MODEL_ID).")
     p.add_argument("--space-url", default=os.environ.get("SPACE_URL"), help="Trading API base URL for collection.")
-    p.add_argument("--data-out", default=os.path.join("data", "trl_sft_train.jsonl"))
-    p.add_argument("--collect-episodes", type=int, default=15)
-    p.add_argument("--collect-max-steps", type=int, default=400)
+    p.add_argument(
+        "--data-out",
+        default=os.environ.get("DATA_OUT", os.path.join("data", "trl_sft_train.jsonl")),
+        help="JSONL path; both the collection output and the TRL SFT input.",
+    )
+    p.add_argument("--collect-episodes", type=int, default=int(os.environ.get("COLLECT_EPISODES", "15")))
+    p.add_argument("--collect-max-steps", type=int, default=int(os.environ.get("COLLECT_MAX_STEPS", "400")))
     p.add_argument(
         "--collect-mode",
         choices=("local", "http"),
@@ -262,7 +266,12 @@ def main() -> None:
         help="Quantise the base model to NF4 before LoRA (required for 3B on T4).",
     )
     p.add_argument("--output-dir", default=os.environ.get("OUTPUT_DIR", os.path.join("results", "phase3_lora")))
-    p.add_argument("--skip-collect", action="store_true")
+    p.add_argument(
+        "--skip-collect",
+        action="store_true",
+        default=os.environ.get("SKIP_COLLECT", "").lower() in ("1", "true", "yes"),
+        help="Skip data collection and use the pre-existing --data-out JSONL.",
+    )
     p.add_argument("--skip-push", action="store_true")
     p.add_argument("--private-repo", action="store_true", help="Create the Hub model repo as private.")
     p.add_argument(
