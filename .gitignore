@@ -39,6 +39,9 @@ ENV/
 data/trl_sft_train.jsonl
 data/trl_sft_train_cpu.jsonl
 
+# Local one-shot HF setup helpers (may contain tokens)
+_hf_setup_*.py
+
 # Phase 3 trained adapters / checkpoints (rebuild via scripts/trl_sft_train.py).
 # Too large for GitHub; only the loss PNG is committed under results/.
 results/phase3_smoke/
