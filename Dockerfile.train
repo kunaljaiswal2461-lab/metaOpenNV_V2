@@ -19,7 +19,7 @@ COPY . .
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONUTF8=1
-ENV SPACE_URL=https://huggingface.co/spaces/Kj2461/metaOpenNV_V2
+ENV SPACE_URL=https://kj2461-metaopennv-v2.hf.space
 
 EXPOSE 7860
 

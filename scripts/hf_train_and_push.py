@@ -167,6 +167,13 @@ def main() -> None:
     p.add_argument("--data-out", default=os.path.join("data", "trl_sft_train.jsonl"))
     p.add_argument("--collect-episodes", type=int, default=15)
     p.add_argument("--collect-max-steps", type=int, default=400)
+    p.add_argument(
+        "--collect-mode",
+        choices=("local", "http"),
+        default=os.environ.get("COLLECT_MODE", "local"),
+        help="local = run TradingEnvironment in-process (avoids HF proxy 429); "
+             "http = hit SPACE_URL (legacy, rate-limited).",
+    )
     p.add_argument("--task-name", default="risk_aware_trading")
     p.add_argument(
         "--model-id",
@@ -205,17 +212,18 @@ def main() -> None:
 
     try:
         if not args.skip_collect:
-            _set_state(phase="collecting SFT data from API")
-            _run(
-                [
-                    sys.executable,
-                    os.path.join("scripts", "collect_sft_dataset.py"),
-                    "--episodes", str(args.collect_episodes),
-                    "--max-steps", str(args.collect_max_steps),
-                    "--task-name", args.task_name,
-                    "--out", args.data_out,
-                ]
-            )
+            _set_state(phase=f"collecting SFT data ({args.collect_mode})")
+            collect_cmd = [
+                sys.executable,
+                os.path.join("scripts", "collect_sft_dataset.py"),
+                "--episodes", str(args.collect_episodes),
+                "--max-steps", str(args.collect_max_steps),
+                "--task-name", args.task_name,
+                "--out", args.data_out,
+            ]
+            if args.collect_mode == "local":
+                collect_cmd.append("--local")
+            _run(collect_cmd)
         _set_state(phase=f"TRL SFT on {args.model_id}")
         _run(
             [
