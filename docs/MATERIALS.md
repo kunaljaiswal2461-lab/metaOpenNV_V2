@@ -9,7 +9,7 @@ Hackathon rules ask for **URLs**, not large binaries in the Space repo. Add ever
 | HF GPU training (no Colab) | [HF_GPU_TRAIN.md](HF_GPU_TRAIN.md) | Second Space + `Dockerfile.train` + `HF_HUB_MODEL_ID` |
 | Source (GitHub) | https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2 | Live |
 | Training Colab (HF TRL SFT) | [Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb) | Same flow as README Phase 3 |
-| Mini-blog (Hugging Face post) | *add in Phase 7* | TBD |
+| Mini-blog (storytelling writeup) | [`MINI_BLOG_STORY.md`](MINI_BLOG_STORY.md) | Ready-to-submit short narrative with evidence from committed runs |
 | Demo video (YouTube, under 2 minutes) | *add in Phase 7* | TBD |
 | Phase 4 plots (PNG) | [`results/phase4_episode_return.png`](../results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](../results/phase4_mean_return_bar.png) | Regenerate: `python -m eval.phase4_benchmark` |
 | Phase 3 trained adapter (Hub model) | https://huggingface.co/Kj2461/metaOpenNV-sft-qwen15 | LoRA r=16 on Qwen2.5-1.5B, T4-medium, 1 epoch on 5,850 rows |
