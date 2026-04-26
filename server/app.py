@@ -264,6 +264,7 @@ def _format_pct(x: float) -> str:
 
 
 def _build_indicator_html(values: list[float], series: list[list[float]]) -> str:
+    """Seven indicators in a fixed 3 + 3 + 1 row grid (HTML rows; single gr.HTML update)."""
     cards: list[str] = []
     for i, name in enumerate(_FEATURE_NAMES):
         v = values[i] if i < len(values) else 0.0
@@ -303,7 +304,12 @@ def _build_indicator_html(values: list[float], series: list[list[float]]) -> str
             </div>
             """
         )
-    return f'<div class="ind-grid">{"".join(cards)}</div>'
+    r1, r2, r3 = "".join(cards[0:3]), "".join(cards[3:6]), "".join(cards[6:7])
+    return f"""<div class="ind-grid-wrap">
+<div class="ind-grid-row">{r1}</div>
+<div class="ind-grid-row">{r2}</div>
+<div class="ind-grid-row ind-grid-row-single">{r3}</div>
+</div>"""
 
 
 def _empty_pv_df() -> pd.DataFrame:
@@ -413,7 +419,7 @@ def run_episode(
     seed: int,
     speed_ms: int,
 ) -> Iterator[tuple]:
-    """Roll one episode and yield UI updates every step."""
+    """Roll one episode; env.step every tick, Gradio yields batched (every 10th + terminal)."""
     speed = max(0.0, min(0.5, speed_ms / 1000.0))
     env = TradingEnvironment(
         random_episode_start=False,
@@ -486,24 +492,30 @@ def run_episode(
             columns=["Step", "Action", "Reward", "Cum. Reward", "Cash", "Holdings", "PV"],
         )
 
-        yield (
-            _build_indicator_html(last_feats, feat_series),
-            pd.DataFrame(pv_rows, columns=["Step", "Portfolio Value"]),
-            pd.DataFrame(price_rows, columns=["Step", "SPY Price"]),
-            log_df,
-            _build_kpi_strip(pv_curve, total_reward, trades),
-            f"Step {step_idx+1}/{episode_length} • {strategy} • {regime} • done={obs.done}",
-            _action_label(last_action),
-            f"{float(obs.reward):+.6f}",
-            f"{total_reward:+.6f}",
-            f"${obs.port_val:,.2f}",
-            f"{obs.holdings:.4f} SPY",
-            f"${obs.port_cash:,.2f}",
-            f"${obs.close_price:,.2f}",
-            _format_pct(ret_pct),
-            gr.update(value=obs.done),
-            _dataset_label(getattr(obs, "dataset", "spy")),
-        )
+        # UI batching only: env.step + all accumulators above run every iteration unchanged.
+        # Same yield tuple shape/order as before; Gradio/WebSocket updates less often (less lag).
+        step_n = step_idx + 1
+        should_yield = (step_n % 10 == 0) or bool(obs.done) or (step_n >= int(episode_length))
+
+        if should_yield:
+            yield (
+                _build_indicator_html(last_feats, feat_series),
+                pd.DataFrame(pv_rows, columns=["Step", "Portfolio Value"]),
+                pd.DataFrame(price_rows, columns=["Step", "SPY Price"]),
+                log_df,
+                _build_kpi_strip(pv_curve, total_reward, trades),
+                f"Step {step_n}/{episode_length} • {strategy} • {regime} • done={obs.done}",
+                _action_label(last_action),
+                f"{float(obs.reward):+.6f}",
+                f"{total_reward:+.6f}",
+                f"${obs.port_val:,.2f}",
+                f"{obs.holdings:.4f} SPY",
+                f"${obs.port_cash:,.2f}",
+                f"${obs.close_price:,.2f}",
+                _format_pct(ret_pct),
+                gr.update(value=obs.done),
+                _dataset_label(getattr(obs, "dataset", "spy")),
+            )
 
         if speed > 0:
             time.sleep(speed)
@@ -827,18 +839,31 @@ input[type="range"]::-moz-range-thumb {
 .regime-rules { color: #737373; font-size: 12px; margin: 0; padding-left: 22px; }
 .regime-rules li { margin: 4px 0; }
 
-.ind-grid {
+.ind-grid-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+}
+.ind-grid-row {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     gap: 8px !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    padding-bottom: 4px;
     width: 100% !important;
+    overflow-x: auto !important;
+    padding-bottom: 2px;
 }
-.ind-grid::-webkit-scrollbar { height: 6px; }
-.ind-grid::-webkit-scrollbar-thumb { background: #262626; border-radius: 3px; }
+.ind-grid-row::-webkit-scrollbar { height: 6px; }
+.ind-grid-row::-webkit-scrollbar-thumb { background: #262626; border-radius: 3px; }
+.ind-grid-row-single {
+    justify-content: flex-start !important;
+}
+.ind-grid-row-single .ind-card {
+    flex: 0 1 auto !important;
+    min-width: 108px !important;
+    max-width: 220px;
+}
 .ind-card {
     flex: 1 1 0 !important;
     min-width: 108px !important;
@@ -882,7 +907,14 @@ input[type="range"]::-moz-range-thumb {
 .kpi-value { font-size: 22px; font-weight: 800; margin: 6px 0 4px 0; color: #ffffff; }
 .kpi-sub { color: #525252; font-size: 10px; letter-spacing: 0.06em; }
 
-.readout-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.readout-row {
+    display: grid !important;
+    grid-template-columns: repeat(11, minmax(64px, 1fr)) !important;
+    gap: 8px !important;
+    align-items: stretch !important;
+    overflow-x: auto !important;
+    width: 100% !important;
+}
 .readout-row .gr-form {
     background: #151515 !important;
     border: none !important;
@@ -944,6 +976,23 @@ with gr.Blocks(title="metaOpenNV — SPY RL Terminal") as demo:
                 with gr.Row():
                     run_btn = gr.Button("▶  Run Episode", variant="primary", scale=2)
                     reset_btn = gr.Button("↺  Reset Singleton Env", scale=1)
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        pv_chart = gr.LinePlot(
+                            value=_empty_pv_df(),
+                            x="Step",
+                            y="Portfolio Value",
+                            title="Equity curve",
+                            height=320,
+                        )
+                    with gr.Column(scale=1):
+                        price_chart = gr.LinePlot(
+                            value=_empty_price_df(),
+                            x="Step",
+                            y="SPY Price",
+                            title="SPY price",
+                            height=320,
+                        )
 
             regime_panel = gr.HTML(_regime_panel_html("risk_aware_trading"))
 
@@ -958,41 +1007,23 @@ with gr.Blocks(title="metaOpenNV — SPY RL Terminal") as demo:
 
             with gr.Group(elem_classes="section-card"):
                 gr.HTML("<h3>Live Readout · per-step state</h3>")
-                with gr.Row(elem_classes="readout-row"):
-                    step_label = gr.Textbox(label="Step / Mode", interactive=False, show_label=True, value="awaiting episode")
-                    action_label_box = gr.Textbox(label="Last Action", interactive=False, value="—")
-                    reward_box = gr.Textbox(label="Reward (this step)", interactive=False, value="0.000000")
-                    cum_reward_box = gr.Textbox(label="Σ Reward", interactive=False, value="0.000000")
-                    pv_box = gr.Textbox(label="Portfolio Value", interactive=False, value=f"${_INITIAL_CASH:,.2f}")
-                    cash_box = gr.Textbox(label="Cash", interactive=False, value=f"${_INITIAL_CASH:,.2f}")
-                    holdings_box = gr.Textbox(label="Holdings", interactive=False, value="0.0000 SPY")
-                with gr.Row(elem_classes="readout-row"):
-                    price_box = gr.Textbox(label="Last SPY Price", interactive=False, value="$0.00")
-                    return_box = gr.Textbox(label="Episode Return", interactive=False, value="+0.00%")
-                    done_chk = gr.Checkbox(label="done", value=False, interactive=False)
-                    dataset_box = gr.Textbox(
-                        label="Active Dataset",
-                        interactive=False,
-                        value=_dataset_label("spy"),
-                    )
-
-            with gr.Row():
-                with gr.Column(scale=1):
-                    pv_chart = gr.LinePlot(
-                        value=_empty_pv_df(),
-                        x="Step",
-                        y="Portfolio Value",
-                        title="Equity curve",
-                        height=320,
-                    )
-                with gr.Column(scale=1):
-                    price_chart = gr.LinePlot(
-                        value=_empty_price_df(),
-                        x="Step",
-                        y="SPY Price",
-                        title="SPY price",
-                        height=320,
-                    )
+                with gr.Group():
+                    with gr.Row(equal_height=True, elem_classes="readout-row"):
+                        step_label = gr.Textbox(label="Step / Mode", interactive=False, show_label=True, value="awaiting episode")
+                        action_label_box = gr.Textbox(label="Last Action", interactive=False, value="—")
+                        reward_box = gr.Textbox(label="Reward (this step)", interactive=False, value="0.000000")
+                        cum_reward_box = gr.Textbox(label="Σ Reward", interactive=False, value="0.000000")
+                        pv_box = gr.Textbox(label="Portfolio Value", interactive=False, value=f"${_INITIAL_CASH:,.2f}")
+                        cash_box = gr.Textbox(label="Cash", interactive=False, value=f"${_INITIAL_CASH:,.2f}")
+                        holdings_box = gr.Textbox(label="Holdings", interactive=False, value="0.0000 SPY")
+                        price_box = gr.Textbox(label="Last SPY Price", interactive=False, value="$0.00")
+                        return_box = gr.Textbox(label="Episode Return", interactive=False, value="+0.00%")
+                        done_chk = gr.Checkbox(label="done", value=False, interactive=False)
+                        dataset_box = gr.Textbox(
+                            label="Active Dataset",
+                            interactive=False,
+                            value=_dataset_label("spy"),
+                        )
 
             with gr.Group(elem_classes="section-card"):
                 gr.HTML("<h3>Episode Performance Metrics</h3>")
