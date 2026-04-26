@@ -693,34 +693,13 @@ body {
     max-width: 1480px !important;
     margin: 0 auto !important;
     padding: 8px !important;
-    position: relative;
-    overflow: visible !important;
 }
-.gradio-container .wrap,
-.gradio-container .contain,
-.gradio-container main {
-    background: transparent !important;
-    position: relative !important;
-    z-index: 0 !important;
-    min-height: 0 !important;
-    overflow: visible !important;
-}
-
-/* Plotly / LinePlot: keep plots in normal flow so scroll compositing does not blank the page */
-.gradio-container .js-plotly-plot,
-.gradio-container .plotly-graph-div {
-    position: relative !important;
-    z-index: 0 !important;
-    max-width: 100% !important;
-}
-.gradio-container .js-plotly-plot .plotly .main-svg {
-    overflow: visible !important;
-}
-
-/* Dataframe trace table above following content */
+/*
+  Do not override `.wrap` / `main` with min-height, z-index, or overflow — on Gradio 6
+  that can collapse the scroll root or break compositing so blocks vanish when scrolling
+  back up from the bottom.
+*/
 .gradio-container .gr-dataframe {
-    position: relative !important;
-    z-index: 1 !important;
     background: #151515 !important;
 }
 .gradio-container h1, .gradio-container h2, .gradio-container h3, .gradio-container h4 {
