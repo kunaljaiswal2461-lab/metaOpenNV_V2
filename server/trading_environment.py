@@ -67,10 +67,11 @@ class TradingEnvironment(Environment):
         self.random_episode_start = random_episode_start
         self.episode_length = episode_length
         self.rng = np.random.default_rng(seed)
+        # 7-feature observation schema (multicollinearity-audited Apr 2026).
+        # EMA-12 dist, MACD-signal gap, and ATR% were dropped as redundant.
         self.feat = [
             'log_return', 'sma5_dist', 'sma20_dist', 'rsi',
-            'norm_volume', 'volatility', 'vwap_dist', 'ema12_dist',
-            'macd_signal_gap', 'atr_pct'
+            'norm_volume', 'volatility', 'vwap_dist'
         ]
         # Active dataset for this episode. Boot up on the primary set so
         # the very first request that lands before any reset() still has

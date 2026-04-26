@@ -7,7 +7,7 @@ This module owns:
    remote agents / judges. The contract is **untouched** — it matches
    ``openenv.yaml`` and the README Phase 2 table.
 2. A Gradio UI mounted at ``/`` shaped like a real quant research terminal:
-   live regime/agent controls, all 10 technical indicators visible at every
+   live regime/agent controls, all 7 technical indicators visible at every
    step, full per-step reward + portfolio readout, equity / price charts
    with action markers, and the same "Episode Performance Metrics" strip
    judges expect (return, Sharpe, Calmar, max drawdown, total trades,
@@ -97,7 +97,7 @@ def state() -> TradingState:
 # UI helpers — pure functions of (env, episode trace)
 # ---------------------------------------------------------------------------
 
-# 10-feature schema as emitted by ``data/preprocess.py`` and consumed by all
+# 7-feature schema as emitted by ``data/preprocess.py`` and consumed by all
 # teachers / prompts. Keep the order in sync with TradingEnvironment.feat.
 _FEATURE_NAMES: tuple[str, ...] = (
     "log_return",
@@ -107,9 +107,6 @@ _FEATURE_NAMES: tuple[str, ...] = (
     "norm_volume",
     "volatility",
     "vwap_dist",
-    "ema12_dist",
-    "macd_signal_gap",
-    "atr_pct",
 )
 _FEATURE_LABELS: dict[str, str] = {
     "log_return": "Log Return",
@@ -119,9 +116,6 @@ _FEATURE_LABELS: dict[str, str] = {
     "norm_volume": "Volume / 20-MA",
     "volatility": "Volatility",
     "vwap_dist": "VWAP dist",
-    "ema12_dist": "EMA-12 dist",
-    "macd_signal_gap": "MACD - signal",
-    "atr_pct": "ATR %",
 }
 _FEATURE_HELP: dict[str, str] = {
     "log_return": "ln(P_t / P_t-1) — last bar return",
@@ -131,10 +125,8 @@ _FEATURE_HELP: dict[str, str] = {
     "norm_volume": "Vol / 20-bar avg vol",
     "volatility": "StdDev of log return over 10 bars",
     "vwap_dist": "(P - VWAP) / VWAP — cumulative fair value gap",
-    "ema12_dist": "(P - EMA12) / EMA12 — short-trend alignment",
-    "macd_signal_gap": "MACD histogram / price",
-    "atr_pct": "ATR(14) / price — volatility regime",
 }
+_FEATURE_COUNT = len(_FEATURE_NAMES)
 
 # Human-readable labels for the active OHLCV dataset shown in the live UI.
 _DATASET_LABELS: dict[str, str] = {
@@ -157,8 +149,8 @@ _TASK_DESCRIPTIONS: dict[str, dict[str, str]] = {
             "Best for stress-testing reactive policies."
         ),
         "rules": [
-            "Window = 10 bars (103-dim observation: 100 market + 3 portfolio).",
-            "Per-step features: log return, SMA-5/20 distances, RSI, volume z, volatility, VWAP/EMA distances, MACD-signal gap, ATR%.",
+            "Window = 10 bars (73-dim observation: 70 market + 3 portfolio).",
+            "Per-step features: log return, SMA-5/20 distances, RSI, volume z, volatility, VWAP distance.",
             "Reward = composite (alpha + downside + dSharpe + Treynor − tx friction).",
         ],
     },
@@ -170,7 +162,7 @@ _TASK_DESCRIPTIONS: dict[str, dict[str, str]] = {
             "(Kj2461/metaOpenNV-sft-qwen15) was trained on this regime."
         ),
         "rules": [
-            "Window = 20 bars (203-dim observation).",
+            "Window = 20 bars (143-dim observation).",
             "Reward dominated by alpha + dSharpe; downside variance keeps drawdowns honest.",
             "Liquidation triggers automatically at PV < 40% of initial capital.",
         ],
@@ -183,7 +175,7 @@ _TASK_DESCRIPTIONS: dict[str, dict[str, str]] = {
             "reason across sub-trends."
         ),
         "rules": [
-            "Window = 50 bars (503-dim observation).",
+            "Window = 50 bars (353-dim observation).",
             "Best regime for long-context LLMs / Track-H 3B + LoRA runs.",
             "Highest reward variance; expect bigger swings in equity curve.",
         ],
@@ -202,20 +194,20 @@ _INITIAL_CASH = 10000.0
 
 
 def _last_bar_features(obs: TradingObservation, window: int) -> list[float]:
-    """Return the latest bar's 10-feature row from the flattened observation."""
+    """Return the latest bar's feature row from the flattened observation."""
     mf = list(obs.market_features or [])
-    if len(mf) < 10:
-        return [0.0] * 10
-    return [float(x) for x in mf[-10:]]
+    if len(mf) < _FEATURE_COUNT:
+        return [0.0] * _FEATURE_COUNT
+    return [float(x) for x in mf[-_FEATURE_COUNT:]]
 
 
 def _series_for_feature(obs: TradingObservation, window: int, feat_idx: int) -> list[float]:
     """Pull one feature's time series across the obs window for sparkline charts."""
     mf = list(obs.market_features or [])
-    if len(mf) % 10 != 0 or len(mf) == 0:
+    if len(mf) % _FEATURE_COUNT != 0 or len(mf) == 0:
         return []
-    n = len(mf) // 10
-    return [float(mf[i * 10 + feat_idx]) for i in range(n)]
+    n = len(mf) // _FEATURE_COUNT
+    return [float(mf[i * _FEATURE_COUNT + feat_idx]) for i in range(n)]
 
 
 def _action_label(a: int) -> str:
@@ -277,7 +269,7 @@ def _build_indicator_html(values: list[float], series: list[list[float]]) -> str
         v = values[i] if i < len(values) else 0.0
         ser = series[i] if i < len(series) else []
         # Color-code per-feature: green-ish when "bullish-ish", red when "bearish-ish".
-        if name in ("log_return", "sma5_dist", "sma20_dist", "vwap_dist", "ema12_dist", "macd_signal_gap"):
+        if name in ("log_return", "sma5_dist", "sma20_dist", "vwap_dist"):
             color = "#22c55e" if v > 0 else ("#ef4444" if v < 0 else "#94a3b8")
         elif name == "rsi":
             color = "#ef4444" if v > 0.7 else ("#f59e0b" if v < 0.3 else "#22c55e")
@@ -299,8 +291,6 @@ def _build_indicator_html(values: list[float], series: list[list[float]]) -> str
             display_val = f"{v:.3f}"
         elif name in ("norm_volume",):
             display_val = f"{v:.2f}×"
-        elif name in ("atr_pct",):
-            display_val = f"{v*100:.3f}%"
         else:
             display_val = f"{v:+.4f}"
 
@@ -443,7 +433,7 @@ def run_episode(
 
     # First render: dashboard at t=0 before any step is taken.
     last_feats = _last_bar_features(obs, window)
-    feat_series = [_series_for_feature(obs, window, i) for i in range(10)]
+    feat_series = [_series_for_feature(obs, window, i) for i in range(_FEATURE_COUNT)]
     yield (
         _build_indicator_html(last_feats, feat_series),
         pd.DataFrame(pv_rows, columns=["Step", "Portfolio Value"]),
@@ -488,7 +478,7 @@ def run_episode(
         )
 
         last_feats = _last_bar_features(obs, window)
-        feat_series = [_series_for_feature(obs, window, i) for i in range(10)]
+        feat_series = [_series_for_feature(obs, window, i) for i in range(_FEATURE_COUNT)]
 
         ret_pct = (obs.port_val / _INITIAL_CASH) - 1.0
         log_df = pd.DataFrame(
@@ -614,7 +604,7 @@ def manual_step_action(
     log_state = pd.concat([log_state, new_row], ignore_index=True).tail(200)
 
     last_feats = _last_bar_features(obs, window)
-    feat_series = [_series_for_feature(obs, window, i) for i in range(10)]
+    feat_series = [_series_for_feature(obs, window, i) for i in range(_FEATURE_COUNT)]
     pv_curve = pv_state["Portfolio Value"].astype(float).tolist()
     ret_pct = (obs.port_val / _INITIAL_CASH) - 1.0
 
@@ -648,7 +638,7 @@ def manual_reset(regime: str):
     price_state = pd.DataFrame({"Step": [0], "SPY Price": [float(obs.close_price)]})
     log_state = _empty_log_df()
     last_feats = _last_bar_features(obs, window)
-    feat_series = [_series_for_feature(obs, window, i) for i in range(10)]
+    feat_series = [_series_for_feature(obs, window, i) for i in range(_FEATURE_COUNT)]
     return (
         _build_indicator_html(last_feats, feat_series),
         pv_state,
@@ -878,7 +868,12 @@ with gr.Blocks(theme=gr.themes.Base(), css=_CSS, title="metaOpenNV — SPY RL Te
 
             with gr.Group(elem_classes="section-card"):
                 gr.HTML("<h3>Technical Indicators · current bar (last 24-bar sparkline)</h3>")
-                indicator_panel = gr.HTML(_build_indicator_html([0.0] * 10, [[] for _ in range(10)]))
+                indicator_panel = gr.HTML(
+                    _build_indicator_html(
+                        [0.0] * _FEATURE_COUNT,
+                        [[] for _ in range(_FEATURE_COUNT)],
+                    )
+                )
 
             with gr.Group(elem_classes="section-card"):
                 gr.HTML("<h3>Live Readout · per-step state</h3>")
@@ -1035,8 +1030,8 @@ with gr.Blocks(theme=gr.themes.Base(), css=_CSS, title="metaOpenNV — SPY RL Te
                   <h1>metaOpenNV — engine specifications</h1>
                   <p>High-fidelity Markov Decision Process for SPY trading. The Gradio UI on the left is a live view of what the agent sees + does; the FastAPI surface (<code>/reset</code>, <code>/step</code>, <code>/state</code>, <code>/health</code>) is the OpenEnv contract judges connect to.</p>
 
-                  <h2>1 · Observation (window × 10 + 3)</h2>
-                  <p>Flattened temporal hierarchy: last <code>WINDOW_SIZE</code> bars of 10 engineered features, plus 3 portfolio scalars. <code>WINDOW_SIZE</code> per task: <code>spy_trading=10</code>, <code>risk_aware_trading=20</code> (default), <code>multi_horizon_trading=50</code>.</p>
+                  <h2>1 · Observation (window × 7 + 3)</h2>
+                  <p>Flattened temporal hierarchy: last <code>WINDOW_SIZE</code> bars of 7 engineered features, plus 3 portfolio scalars. <code>WINDOW_SIZE</code> per task: <code>spy_trading=10</code>, <code>risk_aware_trading=20</code> (default), <code>multi_horizon_trading=50</code>.</p>
                   <table>
                     <thead><tr><th>Indicator</th><th>Formula</th><th>Intent</th></tr></thead>
                     <tbody>
@@ -1047,9 +1042,6 @@ with gr.Blocks(theme=gr.themes.Base(), css=_CSS, title="metaOpenNV — SPY RL Te
                       <tr><td>Norm volume</td><td><code>V / SMA20(V)</code></td><td>Liquidity conviction</td></tr>
                       <tr><td>Volatility</td><td><code>σ(LogRet, 10)</code></td><td>Risk regime</td></tr>
                       <tr><td>VWAP dist</td><td><code>(P − VWAP)/VWAP</code></td><td>Cumulative fair-value gap</td></tr>
-                      <tr><td>EMA-12 dist</td><td><code>(P − EMA12)/EMA12</code></td><td>Short-trend alignment</td></tr>
-                      <tr><td>MACD − signal</td><td><code>MACD_hist / P</code></td><td>Momentum vs signal</td></tr>
-                      <tr><td>ATR%</td><td><code>ATR(14)/P</code></td><td>Volatility scaling</td></tr>
                     </tbody>
                   </table>
 

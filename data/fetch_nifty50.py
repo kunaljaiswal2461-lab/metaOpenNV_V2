@@ -9,12 +9,14 @@ features (log_ret, rsi, sma_5, sma_20, vol_norm, volat, Daily_VWAP,
 Time_to_Close).
 
 Our codebase already has a robust ``data/preprocess.py`` pipeline that
-computes 10 features with proper rolling/EWMA semantics. So instead of
-reproducing the notebook's 8 hand-rolled features, we just download
-real Nifty 50 OHLCV bars and let ``load_and_preprocess`` derive the
-canonical 10-feature view. That way the secondary dataset is fully
-schema-compatible with the existing SPY pipeline, and the agent sees
-the same indicator distribution it was trained on.
+computes the canonical **7-feature** view (multicollinearity-audited Apr
+2026: log_return, sma5_dist, sma20_dist, rsi, norm_volume, volatility,
+vwap_dist) with proper rolling semantics. So instead of reproducing the
+notebook's 8 hand-rolled features, we just download real Nifty 50 OHLCV
+bars and let ``load_and_preprocess`` derive the canonical 7-feature view.
+That way the secondary dataset is fully schema-compatible with the
+existing SPY pipeline, and the agent sees the same indicator distribution
+it was trained on.
 
 The default canonical ticker is RELIANCE.NS — it's the most liquid
 Nifty 50 component and has continuous OHLCV history, so its indicator

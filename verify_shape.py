@@ -9,11 +9,12 @@ import numpy as np
 
 from client import TradingEnv
 
-# Expected (window × 10 market features) + 3 portfolio scalars
+# Expected (window x 7 market features) + 3 portfolio scalars.
+# 7-feature schema, multicollinearity-audited Apr 2026.
 _EXPECTED = {
-    "spy_trading": 10 * 10 + 3,
-    "risk_aware_trading": 20 * 10 + 3,
-    "multi_horizon_trading": 50 * 10 + 3,
+    "spy_trading": 10 * 7 + 3,
+    "risk_aware_trading": 20 * 7 + 3,
+    "multi_horizon_trading": 50 * 7 + 3,
 }
 
 
@@ -24,7 +25,7 @@ def main() -> None:
             obs = env.reset(task_name=task)
         except Exception as exc:
             print(
-                "Connection failed — start the server "
+                "Connection failed - start the server "
                 "(e.g. `python server/app.py`) or set SPACE_URL.\n",
                 exc,
                 file=sys.stderr,

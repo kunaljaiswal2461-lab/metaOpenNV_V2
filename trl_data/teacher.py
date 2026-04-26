@@ -42,9 +42,6 @@ MARKET_FEAT_NAMES: Tuple[str, ...] = (
     "norm_volume",
     "volatility",
     "vwap_dist",
-    "ema12_dist",
-    "macd_signal_gap",
-    "atr_pct",
 )
 _N_FEAT: int = len(MARKET_FEAT_NAMES)
 _SMA20_IDX: int = MARKET_FEAT_NAMES.index("sma20_dist")
@@ -62,7 +59,7 @@ RSI_OVERBOUGHT_THRESHOLD: float = 0.7
 
 
 def _last_bar_features(obs: TradingObservation) -> Tuple[float, ...] | None:
-    """Return the most recent bar's 10-feature row, or ``None`` if the window is empty."""
+    """Return the most recent bar's 7-feature row, or ``None`` if the window is empty."""
     mf = obs.market_features
     if not mf or len(mf) % _N_FEAT != 0:
         return None

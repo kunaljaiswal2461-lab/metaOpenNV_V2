@@ -1,4 +1,4 @@
-"""Q-network for DQN (state_size is dynamic, e.g. 203 for default window)."""
+"""Q-network for DQN (state_size is dynamic, e.g. 143 for default window=20 over the 7-feature observation)."""
 
 import torch
 import torch.nn as nn

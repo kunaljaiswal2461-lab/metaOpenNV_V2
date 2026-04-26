@@ -11,12 +11,14 @@ contract (Phase 2). This file gives a deeper engineering walk-through.
 
 ## 1. Environment workflow (the engine)
 
-1. **Observation.** A flattened vector of length **`WINDOW_SIZE × 10 + 3`**.
-   Default Hugging Face Space uses `WINDOW_SIZE=20` → **203 dims**
-   (200 market + 3 portfolio). Tasks `spy_trading | risk_aware_trading |
-   multi_horizon_trading` map to windows **10 / 20 / 50** → **103 / 203 / 503**
+1. **Observation.** A flattened vector of length **`WINDOW_SIZE × 7 + 3`**.
+   Default Hugging Face Space uses `WINDOW_SIZE=20` → **143 dims**
+   (140 market + 3 portfolio). Tasks `spy_trading | risk_aware_trading |
+   multi_horizon_trading` map to windows **10 / 20 / 50** → **73 / 143 / 353**
    when `task_name` is sent on `POST /reset` or `WINDOW_SIZE` is set in the
-   environment.
+   environment. The 7-feature schema (Apr 2026) replaced the previous 10-feature
+   one — EMA-12, MACD-signal gap, and ATR% were dropped after a multicollinearity
+   audit.
 2. **Action.** Discrete `0=HOLD`, `1=BUY`, `2=SELL` with optional `amount`
    (0–1, default 1.0).
 3. **State update.** Trade executes at next close; **0.1%** transaction cost on
@@ -40,8 +42,11 @@ local RL training and tests; do not import it in agent code.
 
 ## 2. Feature specification (what the agent sees)
 
-10 engineered features per bar over the rolling window, plus 3 portfolio
-scalars. Implementation in [`data/preprocess.py`](data/preprocess.py).
+**7** engineered features per bar over the rolling window, plus 3 portfolio
+scalars. Implementation in [`data/preprocess.py`](data/preprocess.py). The
+schema is multicollinearity-audited (Apr 2026); the redundant indicators
+(EMA-12 dist ≈ SMA-5 dist, MACD-signal gap ≈ SMA-5 − SMA-20 dist, ATR% ≈
+volatility) were dropped to give the agent a tighter, less correlated state.
 
 | Indicator | Formula | Purpose |
 | :--- | :--- | :--- |
@@ -49,12 +54,9 @@ scalars. Implementation in [`data/preprocess.py`](data/preprocess.py).
 | SMA-5 distance | `(P − SMA5) / SMA5` | Short-term mean reversion. |
 | SMA-20 distance | `(P − SMA20) / SMA20` | Medium-term trend strength. |
 | RSI(14) | 14-period RSI normalized 0–1 | Momentum oscillator. |
-| Norm volume | `V / SMA20(V)` | Conviction of moves. |
-| Volatility | `StdDev(log_ret, 10)` | Risk regime. |
+| Norm volume | `V / SMA20(V)` (clipped 0–5) | Conviction of moves. |
+| Volatility | `StdDev(log_return, 10)` | Risk regime. |
 | VWAP distance | `(P − VWAP) / VWAP` | Position vs cumulative typical-price VWAP. |
-| EMA-12 distance | `(P − EMA12) / EMA12` | Short-horizon trend alignment. |
-| MACD − signal | `MACD_hist / P` | Momentum vs signal line. |
-| ATR% | `ATR(14) / P` | Volatility-regime scaling. |
 
 Portfolio: `port_cash` (USD), `holdings` (shares), `port_val` (USD).
 
@@ -138,8 +140,8 @@ Phase 4 provides the regenerable bar/line plots; Phase 3 provides
 - **Space:** https://huggingface.co/spaces/Kj2461/metaOpenNV_V2 (rebuild on
   the submission commit before judging).
 - **GitHub:** https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2.
-- **Manifest:** [`openenv.yaml`](openenv.yaml) (`shape: [203]` matches
-  default `WINDOW_SIZE=20`).
+- **Manifest:** [`openenv.yaml`](openenv.yaml) (`shape: [143]` matches
+  default `WINDOW_SIZE=20` × **7** features + 3 portfolio scalars).
 - **Tests:** `python -m pytest tests/test_env.py -q` (static),
   `python verify_shape.py` (HTTP smoke after `python server/app.py`).
 - **Phase 4 eval:** `python -m eval.phase4_benchmark`.

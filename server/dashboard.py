@@ -291,16 +291,16 @@ DASHBOARD_HTML = """
 
             <div class="doc-cards">
                 <div class="stat-card"><span class="stat-value">3</span><span class="stat-label">Base Actions</span></div>
-                <div class="stat-card"><span class="stat-value">203 dims</span><span class="stat-label">Observation (default)</span></div>
+                <div class="stat-card"><span class="stat-value">143 dims</span><span class="stat-label">Observation (default)</span></div>
                 <div class="stat-card"><span class="stat-value">20-bar</span><span class="stat-label">Default window</span></div>
             </div>
 
             <h3>2. Observation Space Deep-Dive</h3>
-            <p>Default Space: <b>203 values</b> per step (<code>WINDOW_SIZE=20</code> × 10 features + 3 portfolio). Tasks can use 10- or 50-bar windows → 103 or 503 dims.</p>
+            <p>Default Space: <b>143 values</b> per step (<code>WINDOW_SIZE=20</code> &times; <b>7 features</b> + 3 portfolio). Tasks can use 10- or 50-bar windows &rarr; 73 or 353 dims. The 7-feature schema is multicollinearity-audited (Apr 2026) &mdash; EMA-12, MACD-signal, and ATR% were dropped as redundant.</p>
             <table class="doc-table">
                 <thead><tr><th>Feature Layer</th><th>Dimensions (default)</th><th>Description</th></tr></thead>
                 <tbody>
-                    <tr><td>Market Features</td><td>200</td><td>20 past bars × 10 indicators (see README + <code>data/preprocess.py</code>).</td></tr>
+                    <tr><td>Market Features</td><td>140</td><td>20 past bars &times; 7 indicators (see README + <code>data/preprocess.py</code>).</td></tr>
                     <tr><td>Portfolio Stats</td><td>3</td><td>Cash, holdings (shares), portfolio value ($).</td></tr>
                 </tbody>
             </table>

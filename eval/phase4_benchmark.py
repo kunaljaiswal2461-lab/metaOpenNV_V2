@@ -36,7 +36,8 @@ from agent.dqn_agent import DQNAgent
 from models import TradingAction, TradingObservation
 from server.trading_environment import TradingEnvironment
 
-# Feature order must match trading_environment.self.feat
+# Feature order must match trading_environment.self.feat (7-feature schema,
+# multicollinearity-audited Apr 2026).
 _FEAT = [
     "log_return",
     "sma5_dist",
@@ -45,9 +46,6 @@ _FEAT = [
     "norm_volume",
     "volatility",
     "vwap_dist",
-    "ema12_dist",
-    "macd_signal_gap",
-    "atr_pct",
 ]
 _SMA20_IDX = _FEAT.index("sma20_dist")
 

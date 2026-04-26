@@ -33,7 +33,7 @@ It is OpenEnv-style with:
 - `POST /step`
 - `GET /state`
 
-Observation = windowed technical indicators + portfolio state (`cash`, `holdings`, `portfolio_value`).
+Observation = windowed technical indicators + portfolio state (`cash`, `holdings`, `portfolio_value`). The technical-indicator stack is **7 engineered features per bar** (log return, SMA-5 / SMA-20 distance, RSI, normalized volume, volatility, VWAP distance) — multicollinearity-audited in Apr 2026 (we dropped the EMA-12 / MACD-signal / ATR features that overlapped with SMA + volatility, so the agent sees a tighter, decorrelated state).
 
 This means the model has to reason over:
 
