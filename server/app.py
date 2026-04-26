@@ -667,14 +667,62 @@ def manual_reset(regime: str):
 
 _CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-footer { display: none !important; }
 
-:root, body, .gradio-container, .gradio-container > div {
-    background: #0a0a0a !important;
+/* Hide Gradio hub footer only inside the app (never global `footer { display:none }`). */
+.gradio-container footer {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+html {
+    background-color: #0a0a0a !important;
+}
+body {
+    background-color: #0a0a0a !important;
     color: #e5e5e5 !important;
     font-family: 'Inter', system-ui, sans-serif !important;
 }
-.gradio-container { max-width: 1480px !important; margin: 0 auto !important; padding: 8px !important; }
+/* Do NOT set background on `.gradio-container > div` — Gradio 6 uses it as a layout
+   shell; a solid bg there paints over scrolled content (black overlay bug). */
+.gradio-container {
+    background-color: #0a0a0a !important;
+    color: #e5e5e5 !important;
+    max-width: 1480px !important;
+    margin: 0 auto !important;
+    padding: 8px !important;
+    position: relative;
+    overflow: visible !important;
+}
+.gradio-container .wrap,
+.gradio-container .contain,
+.gradio-container main {
+    background: transparent !important;
+    position: relative !important;
+    z-index: 0 !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+}
+
+/* Plotly / LinePlot: keep plots in normal flow so scroll compositing does not blank the page */
+.gradio-container .js-plotly-plot,
+.gradio-container .plotly-graph-div {
+    position: relative !important;
+    z-index: 0 !important;
+    max-width: 100% !important;
+}
+.gradio-container .js-plotly-plot .plotly .main-svg {
+    overflow: visible !important;
+}
+
+/* Dataframe trace table above following content */
+.gradio-container .gr-dataframe {
+    position: relative !important;
+    z-index: 1 !important;
+    background: #151515 !important;
+}
 .gradio-container h1, .gradio-container h2, .gradio-container h3, .gradio-container h4 {
     color: #ffffff !important;
     letter-spacing: 0.03em;
