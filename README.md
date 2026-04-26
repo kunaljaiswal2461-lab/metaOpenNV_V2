@@ -129,6 +129,32 @@ python scripts/trl_sft_train.py --data data/trl_sft_train.jsonl --epochs 1 --out
 
 **Outputs:** `data/trl_sft_train.jsonl` is gitignored (regenerate anytime); **`results/trl_sft_loss.png`** and adapter weights under **`--output-dir`**.
 
+**Closing the loop — base vs fine-tuned on the live env**
+
+Once an adapter exists, [`scripts/eval_llm_on_env.py`](scripts/eval_llm_on_env.py) plays N episodes through `client.TradingEnv` (HTTP) for each model and writes:
+
+- [`results/phase3_eval_metrics.md`](results/phase3_eval_metrics.md) — per-model mean episode reward, std, last-PV, action distribution, teacher-agreement.
+- [`results/phase3_eval_bar.png`](results/phase3_eval_bar.png) — bar chart of mean episode reward.
+
+```bash
+python scripts/eval_llm_on_env.py \
+  --models base=Qwen/Qwen2.5-0.5B-Instruct sft=results/phase3_lora \
+  --episodes 10 --max-steps 300 --task-name risk_aware_trading
+```
+
+**Track-H (richer prompt + bigger model, optional, paid Colab):**
+
+```bash
+python scripts/collect_sft_dataset.py \
+  --episodes 30 --max-steps 400 --task-name multi_horizon_trading \
+  --prompt full --teacher composite --history-len 5 \
+  --out data/trl_sft_train_full.jsonl
+python scripts/trl_sft_train.py --data data/trl_sft_train_full.jsonl \
+  --model-id Qwen/Qwen2.5-3B-Instruct --epochs 1 --output-dir results/phase3_lora_3b
+python scripts/eval_llm_on_env.py --models sft_3b=results/phase3_lora_3b \
+  --prompt full --history-len 5 --task-name multi_horizon_trading
+```
+
 **Judges:** use the **Phase 1** Colab link — it runs the same commands against your Space.
 
 ---
