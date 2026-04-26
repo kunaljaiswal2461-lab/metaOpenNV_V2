@@ -32,9 +32,12 @@ ENV/
 !results/phase4_episode_return.png
 !results/phase4_mean_return_bar.png
 !results/trl_sft_loss.png
+!results/phase3_eval_metrics.md
+!results/phase3_eval_bar.png
 
 # Phase 3 generated dataset (rebuild via scripts/collect_sft_dataset.py)
 data/trl_sft_train.jsonl
+data/trl_sft_train_cpu.jsonl
 
 # Phase 3 trained adapters / checkpoints (rebuild via scripts/trl_sft_train.py).
 # Too large for GitHub; only the loss PNG is committed under results/.

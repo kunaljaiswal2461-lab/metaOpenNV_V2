@@ -142,6 +142,8 @@ python scripts/eval_llm_on_env.py \
   --episodes 10 --max-steps 300 --task-name risk_aware_trading
 ```
 
+If TRL saved only `results/phase3_lora/checkpoint-*`, you can still pass `sft=results/phase3_lora` — the eval script resolves the latest checkpoint folder. For dev without a running Space, add **`--local`** (same physics as `collect_sft_dataset --local`). Qwen tokenizers need **`sentencepiece`** (listed in `requirements-trl.txt`).
+
 **Track-H (richer prompt + bigger model, optional, paid Colab):**
 
 ```bash

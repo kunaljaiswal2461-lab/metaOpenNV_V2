@@ -25,7 +25,9 @@ Notes:
     - Reuses ``build_user_prompt`` so eval prompts match the training prompts.
     - Loads models sequentially (``del`` + ``torch.cuda.empty_cache()`` between)
       so several models fit on a single Colab T4.
-    - HTTP-only env client; honour ``SPACE_URL`` to point at the live Space.
+    - HTTP client by default; honour ``SPACE_URL`` for the live Space.
+    - ``--local`` uses the in-process ``TradingEnvironment`` (same physics as
+      ``collect_sft_dataset --local``; no server required).
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ import os
 import statistics
 import sys
 from collections import Counter, deque
+from typing import Any, Protocol
 
 # Windows: TRL/transformers read bundled Jinja templates as UTF-8.
 os.environ.setdefault("PYTHONUTF8", "1")
@@ -47,6 +50,56 @@ from client import TradingEnv
 from trl_data.eval_utils import format_metrics_md, parse_action, parse_models
 from trl_data.prompt_utils import build_user_prompt
 from trl_data.teacher import TEACHERS, get_teacher
+
+
+class _EnvLike(Protocol):
+    def reset(self, task_name: str | None = None, **kwargs: Any) -> Any: ...
+    def step(self, action: int, amount: float = 1.0) -> Any: ...
+
+
+def _resolve_hf_model_path(ident: str) -> str:
+    """
+    If ``ident`` is an output directory without ``config.json`` at the root
+    (e.g. ``results/phase3_lora`` after TRL saves only ``checkpoint-*``),
+    pick the lexically greatest ``checkpoint-*`` subfolder so users can pass
+    the parent ``--output-dir`` from training.
+    """
+    if not ident or not os.path.isdir(ident):
+        return ident
+    root_cfg = os.path.join(ident, "config.json")
+    if os.path.isfile(root_cfg):
+        return ident
+    candidates: list[tuple[int, str]] = []
+    try:
+        for name in os.listdir(ident):
+            if name.startswith("checkpoint-") and name[len("checkpoint-") :].isdigit():
+                step = int(name.split("-", 1)[1])
+                sub = os.path.join(ident, name)
+                if os.path.isfile(os.path.join(sub, "config.json")):
+                    candidates.append((step, sub))
+    except OSError:
+        return ident
+    if not candidates:
+        return ident
+    candidates.sort(key=lambda x: x[0])
+    return candidates[-1][1]
+
+
+class _LocalTradingEnvGym:
+    """Same reset/step contract as ``client.TradingEnv`` but in-process."""
+
+    def __init__(self) -> None:
+        from models import TradingAction
+        from server.trading_environment import TradingEnvironment
+
+        self._TradingAction = TradingAction
+        self._env = TradingEnvironment(window=20, random_episode_start=True, seed=42)
+
+    def reset(self, task_name: str | None = None, **kwargs: Any):
+        return self._env.reset(task_name=task_name)
+
+    def step(self, action: int, amount: float = 1.0):
+        return self._env.step(self._TradingAction(action=action, amount=amount))
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -95,13 +148,18 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--metrics-out", type=str, default=os.path.join("results", "phase3_eval_metrics.md"))
     p.add_argument("--bar-out", type=str, default=os.path.join("results", "phase3_eval_bar.png"))
+    p.add_argument(
+        "--local",
+        action="store_true",
+        help="Use in-process TradingEnvironment (dev); omit for HTTP + SPACE_URL.",
+    )
     return p
 
 
 def _run_episodes(
     model,
     tokenizer,
-    env: TradingEnv,
+    env: _EnvLike,
     *,
     episodes: int,
     max_steps: int,
@@ -216,14 +274,20 @@ def main() -> None:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     dtype = torch.float16 if device == "cuda" else torch.float32
 
-    env = TradingEnv()
+    if args.local:
+        env: _EnvLike = _LocalTradingEnvGym()
+        env_desc = "local TradingEnvironment(seed=42)"
+    else:
+        env = TradingEnv()
+        env_desc = f"HTTP base_url={env.base_url}"
     print(
-        f"env base_url={env.base_url} device={device} models={list(models)} "
+        f"env {env_desc} device={device} models={list(models)} "
         f"prompt={args.prompt} task={args.task_name}"
     )
 
     rows = []
     for name, ident in models.items():
+        ident = _resolve_hf_model_path(ident)
         print(f"\n=== {name} ({ident}) ===")
         tokenizer = AutoTokenizer.from_pretrained(ident, trust_remote_code=True)
         if tokenizer.pad_token_id is None:
