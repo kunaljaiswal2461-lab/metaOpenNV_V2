@@ -24,7 +24,6 @@ ENV/
 
 # Exceptions
 !inference.py
-!out.txt
 !requirements.txt
 !requirements-trl.txt
 
@@ -36,3 +35,9 @@ ENV/
 
 # Phase 3 generated dataset (rebuild via scripts/collect_sft_dataset.py)
 data/trl_sft_train.jsonl
+
+# Phase 3 trained adapters / checkpoints (rebuild via scripts/trl_sft_train.py).
+# Too large for GitHub; only the loss PNG is committed under results/.
+results/phase3_smoke/
+results/phase3_lora/
+results/phase3_*/
