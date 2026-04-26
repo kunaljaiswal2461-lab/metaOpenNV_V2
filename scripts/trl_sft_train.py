@@ -78,6 +78,14 @@ def main() -> None:
         action="store_true",
         help="Disable gradient checkpointing (faster on small models / CPU smoke tests)",
     )
+    parser.add_argument(
+        "--use-lora",
+        action="store_true",
+        help="Train LoRA adapters only (recommended for >=1B models on T4-class GPUs).",
+    )
+    parser.add_argument("--lora-r", type=int, default=16)
+    parser.add_argument("--lora-alpha", type=int, default=32)
+    parser.add_argument("--lora-dropout", type=float, default=0.05)
     args = parser.parse_args()
 
     try:
@@ -88,6 +96,17 @@ def main() -> None:
         print("Missing dependency:", e)
         print("Install: pip install -r requirements-trl.txt")
         sys.exit(1)
+
+    # Auto-enable LoRA on GPUs with limited VRAM (e.g. T4 16GB) for >=1B models.
+    if not args.use_lora and torch.cuda.is_available():
+        try:
+            free_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        except Exception:
+            free_gb = 0.0
+        looks_big = any(s in args.model_id for s in ("1.5B", "3B", "7B", "8B", "13B"))
+        if looks_big and free_gb < 24.0:
+            print(f"[trl_sft_train] auto-enabling LoRA: model={args.model_id}, total VRAM={free_gb:.1f} GB")
+            args.use_lora = True
 
     if not os.path.isfile(args.data):
         print(f"Dataset not found: {args.data}")
@@ -126,11 +145,31 @@ def main() -> None:
         gradient_checkpointing=not args.no_gradient_checkpointing,
     )
 
-    trainer = SFTTrainer(
+    peft_config = None
+    if args.use_lora:
+        try:
+            from peft import LoraConfig
+        except ImportError:
+            print("peft is required for --use-lora; install: pip install peft")
+            sys.exit(1)
+        peft_config = LoraConfig(
+            r=args.lora_r,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            bias="none",
+            task_type="CAUSAL_LM",
+            target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        )
+        print(f"[trl_sft_train] using LoRA r={args.lora_r} alpha={args.lora_alpha} dropout={args.lora_dropout}")
+
+    trainer_kwargs = dict(
         model=args.model_id,
         args=sft_args,
         train_dataset=train_ds,
     )
+    if peft_config is not None:
+        trainer_kwargs["peft_config"] = peft_config
+    trainer = SFTTrainer(**trainer_kwargs)
 
     trainer.train()
 
