@@ -185,7 +185,7 @@ def main() -> None:
         (args.hub_model_id or os.environ.get("HF_HUB_MODEL_ID") or os.environ.get("HUB_MODEL_ID") or "")
         .strip()
     )
-    space_url = (args.space_url or "").strip() or "https://huggingface.co/spaces/Kj2461/metaOpenNV_V2"
+    space_url = (args.space_url or "").strip() or "https://kj2461-metaopennv-v2.hf.space"
     os.environ["SPACE_URL"] = space_url.rstrip("/")
 
     _set_state(hub_model_id=hub_id or None, phase="starting status server")
