@@ -37,6 +37,18 @@ def sanitize_value(val):
         return 0.0
 
 class TradingEnvironment(Environment):
+    # Datasets are visited in this order, alternating across reset() calls.
+    # The very first reset uses the primary (SPY) set, the next reset
+    # switches to the secondary (Nifty 50 / RELIANCE.NS) set, and after
+    # that episode finishes the cycle wraps back to SPY. Counter is a
+    # class attribute so a single FastAPI process alternates consistently.
+    _DATASETS = [
+        ("spy", os.path.join("data", "spy_prices.csv")),
+        ("nifty50", os.path.join("data", "nifty50_prices.csv")),
+    ]
+    _dataset_cache: dict = {}
+    _global_episode_idx: int = 0
+
     def __init__(
         self,
         window=None,
@@ -46,12 +58,6 @@ class TradingEnvironment(Environment):
         episode_length=390,
         seed=None,
     ):
-        csv_path = os.path.join(ROOT_DIR, 'data', 'spy_prices.csv')
-        if not os.path.exists(csv_path):
-            csv_path = 'data/spy_prices.csv'
-        
-        train_df, _ = load_and_preprocess(csv_path)
-        self.df = train_df.reset_index(drop=True)
         if window is None:
             window = int(os.environ.get("WINDOW_SIZE", "20"))
         self._default_window = int(window)
@@ -66,7 +72,45 @@ class TradingEnvironment(Environment):
             'norm_volume', 'volatility', 'vwap_dist', 'ema12_dist',
             'macd_signal_gap', 'atr_pct'
         ]
+        # Active dataset for this episode. Boot up on the primary set so
+        # the very first request that lands before any reset() still has
+        # a usable observation window.
+        self.active_dataset = "spy"
+        self._load_dataset(self.active_dataset)
         self._reset_state()
+
+    @classmethod
+    def _resolve_csv_path(cls, name: str) -> str:
+        for n, rel_path in cls._DATASETS:
+            if n == name:
+                root_path = os.path.join(ROOT_DIR, rel_path)
+                if os.path.exists(root_path):
+                    return root_path
+                return rel_path
+        raise ValueError(f"Unknown dataset name: {name}")
+
+    def _load_dataset(self, name: str) -> None:
+        """Load (and cache) the preprocessed dataframe for a given dataset.
+
+        Falls back to the primary 'spy' dataset if the requested file is
+        missing on disk so the environment never breaks for users who
+        only have the primary CSV checked out.
+        """
+        cache = TradingEnvironment._dataset_cache
+        if name not in cache:
+            csv_path = self._resolve_csv_path(name)
+            if not os.path.exists(csv_path):
+                if name != "spy":
+                    self._load_dataset("spy")
+                    self.active_dataset = "spy"
+                    return
+                raise FileNotFoundError(
+                    f"Required primary dataset not found at {csv_path}"
+                )
+            train_df, _ = load_and_preprocess(csv_path)
+            cache[name] = train_df.reset_index(drop=True)
+        self.df = cache[name].reset_index(drop=True)
+        self.active_dataset = name
 
     def _reset_state(self):
         self.cash = self.initial_cash
@@ -90,6 +134,16 @@ class TradingEnvironment(Environment):
         return min(len(self.df) - 1, start_step + self.episode_length)
 
     def reset(self, task_name=None) -> TradingObservation:
+        # Rotate datasets across reset() calls so each new episode gets
+        # the next dataset in TradingEnvironment._DATASETS. The counter
+        # is process-global (class attribute), guaranteeing a consistent
+        # alternation regardless of which client kicked off the reset.
+        cls = TradingEnvironment
+        idx = cls._global_episode_idx % len(cls._DATASETS)
+        next_dataset = cls._DATASETS[idx][0]
+        cls._global_episode_idx += 1
+        self._load_dataset(next_dataset)
+
         if task_name and task_name in _TASK_WINDOWS:
             self.window = _TASK_WINDOWS[task_name]
         else:
@@ -159,7 +213,8 @@ class TradingEnvironment(Environment):
             current_step=int(s),
             close_price=sanitize_value(price),
             reward=sanitize_value(reward if reward != 0 else self.last_reward),
-            done=bool(done)
+            done=bool(done),
+            dataset=str(self.active_dataset),
         )
 
     def state(self) -> TradingState:
@@ -170,5 +225,6 @@ class TradingEnvironment(Environment):
             current_step=int(self.current_step),
             history=[],
             INITIAL_CASH=int(self.initial_cash),
-            TRANSACTION_COST=self.cost
+            TRANSACTION_COST=self.cost,
+            dataset=str(self.active_dataset),
         )

@@ -15,6 +15,7 @@ class TradingObservation(BaseModel):
     close_price: float = 0.0      # Current Stock Price for human display
     reward: float = 0.0
     done: bool = False
+    dataset: str = "spy"          # active OHLCV dataset for this episode
 
 class TradingState(BaseModel):
     portfolio_value: float
@@ -24,3 +25,4 @@ class TradingState(BaseModel):
     history: list
     INITIAL_CASH: int
     TRANSACTION_COST: float = 0.001
+    dataset: str = "spy"          # active OHLCV dataset for this episode

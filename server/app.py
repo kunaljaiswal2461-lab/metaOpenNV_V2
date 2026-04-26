@@ -136,6 +136,18 @@ _FEATURE_HELP: dict[str, str] = {
     "atr_pct": "ATR(14) / price — volatility regime",
 }
 
+# Human-readable labels for the active OHLCV dataset shown in the live UI.
+_DATASET_LABELS: dict[str, str] = {
+    "spy": "SPY (S&P 500 ETF) · Primary",
+    "nifty50": "Nifty 50 / RELIANCE.NS · Secondary",
+}
+
+
+def _dataset_label(name: str | None) -> str:
+    if not name:
+        return "—"
+    return _DATASET_LABELS.get(str(name).lower(), str(name))
+
 _TASK_DESCRIPTIONS: dict[str, dict[str, str]] = {
     "spy_trading": {
         "title": "SPY TRADING — short window (10 bars)",
@@ -448,6 +460,7 @@ def run_episode(
         f"${obs.close_price:,.2f}",
         f"{0:.2%}",
         gr.update(value=False),
+        _dataset_label(getattr(obs, "dataset", "spy")),
     )
 
     for step_idx in range(int(episode_length)):
@@ -499,6 +512,7 @@ def run_episode(
             f"${obs.close_price:,.2f}",
             _format_pct(ret_pct),
             gr.update(value=obs.done),
+            _dataset_label(getattr(obs, "dataset", "spy")),
         )
 
         if speed > 0:
@@ -620,6 +634,7 @@ def manual_step_action(
         f"${obs.close_price:,.2f}",
         _format_pct(ret_pct),
         gr.update(value=obs.done),
+        _dataset_label(getattr(obs, "dataset", "spy")),
         cum_reward,
         trade_count,
     )
@@ -650,6 +665,7 @@ def manual_reset(regime: str):
         f"${obs.close_price:,.2f}",
         "+0.00%",
         gr.update(value=False),
+        _dataset_label(getattr(obs, "dataset", "spy")),
         0.0,
         0,
     )
@@ -878,6 +894,11 @@ with gr.Blocks(theme=gr.themes.Base(), css=_CSS, title="metaOpenNV — SPY RL Te
                     price_box = gr.Textbox(label="Last SPY Price", interactive=False, value="$0.00")
                     return_box = gr.Textbox(label="Episode Return", interactive=False, value="+0.00%")
                     done_chk = gr.Checkbox(label="done", value=False, interactive=False)
+                    dataset_box = gr.Textbox(
+                        label="Active Dataset",
+                        interactive=False,
+                        value=_dataset_label("spy"),
+                    )
 
             with gr.Row():
                 with gr.Column(scale=1):
@@ -938,6 +959,7 @@ with gr.Blocks(theme=gr.themes.Base(), css=_CSS, title="metaOpenNV — SPY RL Te
                 price_box,
                 return_box,
                 done_chk,
+                dataset_box,
             ]
 
             run_btn.click(
@@ -964,6 +986,7 @@ with gr.Blocks(theme=gr.themes.Base(), css=_CSS, title="metaOpenNV — SPY RL Te
                 price_box,
                 return_box,
                 done_chk,
+                dataset_box,
                 cum_reward_state,
                 trade_count_state,
             ]
