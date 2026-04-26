@@ -160,8 +160,61 @@ pre{{background:#0b1020;color:#cce;padding:12px;border-radius:6px;max-height:520
     threading.Thread(target=_serve, daemon=True, name="status-server").start()
 
 
+def _push_eval_results(folder: str, repo_id: str, *, private: bool, token: str | None) -> None:
+    """Upload the contents of ``folder`` (results dir) to ``repo_id`` under ``results/``."""
+    from huggingface_hub import HfApi, upload_folder
+
+    api = HfApi(token=token)
+    api.create_repo(repo_id, repo_type="model", exist_ok=True, private=private)
+    upload_folder(
+        repo_id=repo_id,
+        folder_path=folder,
+        repo_type="model",
+        token=token,
+        path_in_repo="results",
+        commit_message="Phase 3 eval artefacts (metrics + plot)",
+    )
+    msg = f"Pushed eval results from {folder} -> https://huggingface.co/{repo_id}/tree/main/results"
+    print(msg, flush=True)
+    _push_log(msg)
+
+
+def _run_eval(args, *, hub_id: str, token: str | None) -> None:
+    """MODE=eval: load base + adapter, evaluate against in-process env, push artefacts."""
+    if not hub_id:
+        raise RuntimeError("MODE=eval needs HF_HUB_MODEL_ID (the trained adapter repo id).")
+    base_id = args.model_id
+    _set_state(phase=f"eval base={base_id} adapter={hub_id}", error=None)
+
+    metrics_out = os.path.join("results", "phase3_eval_metrics.md")
+    bar_out = os.path.join("results", "phase3_eval_bar.png")
+    cmd = [
+        sys.executable,
+        os.path.join("scripts", "eval_llm_on_env.py"),
+        "--models", f"base={base_id}", f"sft={hub_id}",
+        "--episodes", str(args.eval_episodes),
+        "--max-steps", str(args.eval_max_steps),
+        "--task-name", args.task_name,
+        "--local",
+        "--metrics-out", metrics_out,
+        "--bar-out", bar_out,
+    ]
+    _run(cmd)
+
+    _set_state(phase=f"pushing eval results to {hub_id}")
+    _push_eval_results(os.path.dirname(os.path.abspath(metrics_out)), hub_id,
+                       private=args.private_repo, token=token)
+    _set_state(phase="done", error=None)
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument(
+        "--mode",
+        choices=("train", "eval"),
+        default=os.environ.get("MODE", "train"),
+        help="train (default): collect+SFT+push adapter. eval: load adapter, run env eval, push results.",
+    )
     p.add_argument("--hub-model-id", default=None, help="Target Hub model repo (else env HF_HUB_MODEL_ID / HUB_MODEL_ID).")
     p.add_argument("--space-url", default=os.environ.get("SPACE_URL"), help="Trading API base URL for collection.")
     p.add_argument("--data-out", default=os.path.join("data", "trl_sft_train.jsonl"))
@@ -185,6 +238,12 @@ def main() -> None:
     p.add_argument("--skip-collect", action="store_true")
     p.add_argument("--skip-push", action="store_true")
     p.add_argument("--private-repo", action="store_true", help="Create the Hub model repo as private.")
+    p.add_argument(
+        "--eval-episodes", type=int, default=int(os.environ.get("EVAL_EPISODES", "10"))
+    )
+    p.add_argument(
+        "--eval-max-steps", type=int, default=int(os.environ.get("EVAL_MAX_STEPS", "300"))
+    )
     args = p.parse_args()
 
     token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
@@ -195,7 +254,7 @@ def main() -> None:
     space_url = (args.space_url or "").strip() or "https://kj2461-metaopennv-v2.hf.space"
     os.environ["SPACE_URL"] = space_url.rstrip("/")
 
-    _set_state(hub_model_id=hub_id or None, phase="starting status server")
+    _set_state(hub_model_id=hub_id or None, phase=f"starting ({args.mode}) status server")
     _start_status_server()
 
     if not args.skip_push and not hub_id:
@@ -207,6 +266,16 @@ def main() -> None:
     if not args.skip_push and not token:
         _set_state(phase="config error", error="Set HF_TOKEN secret on the Space")
         print("Set HF_TOKEN (Hub write token) for push.", file=sys.stderr)
+        threading.Event().wait()
+        return
+
+    if args.mode == "eval":
+        try:
+            _run_eval(args, hub_id=hub_id, token=token)
+        except Exception as e:
+            err = f"{type(e).__name__}: {e}"
+            traceback.print_exc()
+            _set_state(phase="failed", error=err)
         threading.Event().wait()
         return
 

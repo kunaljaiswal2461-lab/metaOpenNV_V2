@@ -266,12 +266,54 @@ def main() -> None:
     for name, ident in models.items():
         ident = resolve_hf_checkpoint_dir(ident)
         print(f"\n=== {name} ({ident}) ===")
-        tokenizer = AutoTokenizer.from_pretrained(ident, trust_remote_code=True)
-        if tokenizer.pad_token_id is None:
-            tokenizer.pad_token = tokenizer.eos_token
-        model = AutoModelForCausalLM.from_pretrained(
-            ident, torch_dtype=dtype, trust_remote_code=True
-        ).to(device).eval()
+
+        # Detect PEFT/LoRA adapters: presence of adapter_config.json (local or Hub)
+        # without a regular config.json. We then load the listed base model and
+        # apply the adapter on top.
+        adapter_cfg_path: str | None = None
+        try:
+            from huggingface_hub import hf_hub_download
+            from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError
+        except Exception:
+            hf_hub_download = None  # type: ignore[assignment]
+            EntryNotFoundError = RepositoryNotFoundError = Exception  # type: ignore[assignment]
+
+        if os.path.isdir(ident) and os.path.isfile(os.path.join(ident, "adapter_config.json")) \
+                and not os.path.isfile(os.path.join(ident, "config.json")):
+            adapter_cfg_path = os.path.join(ident, "adapter_config.json")
+        elif "/" in ident and not os.path.isdir(ident) and hf_hub_download is not None:
+            try:
+                adapter_cfg_path = hf_hub_download(repo_id=ident, filename="adapter_config.json")
+            except (EntryNotFoundError, RepositoryNotFoundError, Exception):
+                adapter_cfg_path = None
+
+        if adapter_cfg_path:
+            import json as _json
+            with open(adapter_cfg_path, "r", encoding="utf-8") as _f:
+                _cfg = _json.load(_f)
+            base_id = _cfg.get("base_model_name_or_path") or _cfg.get("base_model_name_or_path".lower())
+            if not base_id:
+                raise RuntimeError(f"adapter_config.json at {adapter_cfg_path} missing base_model_name_or_path")
+            try:
+                from peft import PeftModel
+            except ImportError as e:
+                print("peft is required to load LoRA adapters; install peft.")
+                raise
+            print(f"  loading PEFT adapter (base={base_id})")
+            tokenizer = AutoTokenizer.from_pretrained(ident, trust_remote_code=True)
+            if tokenizer.pad_token_id is None:
+                tokenizer.pad_token = tokenizer.eos_token
+            base_model = AutoModelForCausalLM.from_pretrained(
+                base_id, torch_dtype=dtype, trust_remote_code=True
+            ).to(device).eval()
+            model = PeftModel.from_pretrained(base_model, ident).to(device).eval()
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(ident, trust_remote_code=True)
+            if tokenizer.pad_token_id is None:
+                tokenizer.pad_token = tokenizer.eos_token
+            model = AutoModelForCausalLM.from_pretrained(
+                ident, torch_dtype=dtype, trust_remote_code=True
+            ).to(device).eval()
 
         rewards, final_pvs, action_counts, teacher_match, total_steps = _run_episodes(
             model,
