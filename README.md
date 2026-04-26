@@ -52,7 +52,8 @@ Single place for reviewers (mirrored in [`docs/MATERIALS.md`](docs/MATERIALS.md)
 | **Training Colab** (optional fallback) | [Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb) | Same TRL flow without a GPU Space. |
 | **Mini-blog** (HF post) | *URL to be added in Phase 7* | &lt; 2 min read OK |
 | **Demo video** (YouTube) | *URL to be added in Phase 7* | **&lt; 2 minutes**; link only |
-| **Plots / results** | [`results/phase4_episode_return.png`](results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png), [`results/phase4_metrics.md`](results/phase4_metrics.md), [`results/trl_sft_loss.png`](results/trl_sft_loss.png) (distilgpt2 smoke, 360 rows) | Phase 4: `python -m eval.phase4_benchmark`. Phase 3: [`scripts/trl_sft_train.py`](scripts/trl_sft_train.py) after [`scripts/collect_sft_dataset.py`](scripts/collect_sft_dataset.py) |
+| **Trained adapter (Hub model)** | [Kj2461/metaOpenNV-sft-qwen15](https://huggingface.co/Kj2461/metaOpenNV-sft-qwen15) | LoRA on `Qwen/Qwen2.5-1.5B-Instruct`, 1 epoch on 5,850 SFT rows from `risk_aware_trading`, T4-medium |
+| **Plots / results** | [`results/phase4_episode_return.png`](results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png), [`results/phase4_metrics.md`](results/phase4_metrics.md), [`results/trl_sft_loss.png`](results/trl_sft_loss.png), [`results/phase3_eval_metrics.md`](results/phase3_eval_metrics.md), [`results/phase3_eval_bar.png`](results/phase3_eval_bar.png) | Phase 4: `python -m eval.phase4_benchmark`. Phase 3 train: HF GPU Space (auto). Phase 3 eval: `python scripts/eval_llm_on_env.py --models base=... sft=Kj2461/metaOpenNV-sft-qwen15 --local` |
 
 ### 3-minute read for judges
 
@@ -132,20 +133,36 @@ python scripts/trl_sft_train.py --data data/trl_sft_train.jsonl --epochs 1 --out
 
 **Outputs:** `data/trl_sft_train.jsonl` is gitignored (regenerate anytime); **`results/trl_sft_loss.png`** and adapter weights under **`--output-dir`**.
 
+### Phase 3 production run (Apr 2026, T4-medium HF GPU Space)
+
+The submission training was driven entirely from a second Hugging Face Space (`Kj2461/metaOpenNV_V2-train`) using [`Dockerfile.train`](Dockerfile.train) + [`scripts/hf_train_and_push.py`](scripts/hf_train_and_push.py) — no Colab. The Space binds a status page on boot, runs the full collect → SFT → push pipeline in-process, and pushes the LoRA adapter to a Model repo.
+
+| Setting | Value |
+| :--- | :--- |
+| Base model | `Qwen/Qwen2.5-1.5B-Instruct` (auto-LoRA r=16, alpha=32, q/k/v/o + MLP) |
+| Hardware | Nvidia T4-medium (16 GB), fp16 |
+| Data | `risk_aware_trading`, 15 episodes × 390 steps = **5,850 rows** (collected in-process to avoid HF gateway rate-limits) |
+| Wall clock | **1 h 33 m** for 1 epoch (1,463 steps, accumulation = 4) |
+| Final train loss | **0.2914** (initial 1.7436) |
+| Mean token accuracy | **0.8875** (initial 0.6092) |
+| Adapter | [`Kj2461/metaOpenNV-sft-qwen15`](https://huggingface.co/Kj2461/metaOpenNV-sft-qwen15) (4.4 MB safetensors) |
+
+![Phase 3 SFT training](results/trl_sft_loss.png)
+
 **Closing the loop — base vs fine-tuned on the live env**
 
-Once an adapter exists, [`scripts/eval_llm_on_env.py`](scripts/eval_llm_on_env.py) plays N episodes through `client.TradingEnv` (HTTP) for each model and writes:
+Once an adapter exists, [`scripts/eval_llm_on_env.py`](scripts/eval_llm_on_env.py) plays N episodes for each model and writes:
 
 - [`results/phase3_eval_metrics.md`](results/phase3_eval_metrics.md) — per-model mean episode reward, std, last-PV, action distribution, teacher-agreement.
 - [`results/phase3_eval_bar.png`](results/phase3_eval_bar.png) — bar chart of mean episode reward.
 
 ```bash
 python scripts/eval_llm_on_env.py \
-  --models base=Qwen/Qwen2.5-0.5B-Instruct sft=results/phase3_lora \
-  --episodes 10 --max-steps 300 --task-name risk_aware_trading
+  --models base=Qwen/Qwen2.5-1.5B-Instruct sft=Kj2461/metaOpenNV-sft-qwen15 \
+  --episodes 10 --max-steps 300 --task-name risk_aware_trading --local
 ```
 
-If TRL saved only `results/phase3_lora/checkpoint-*`, you can still pass `sft=results/phase3_lora` — the eval script resolves the latest checkpoint folder. For dev without a running Space, add **`--local`** (same physics as `collect_sft_dataset --local`). Qwen tokenizers need **`sentencepiece`** (listed in `requirements-trl.txt`).
+The eval script auto-detects PEFT adapters: it reads `adapter_config.json`, loads the listed `base_model_name_or_path`, and applies `PeftModel.from_pretrained` on top. Pass either an HF repo id (e.g. `Kj2461/metaOpenNV-sft-qwen15`) or a local TRL output dir. For dev without a running Space, add **`--local`** (same physics as `collect_sft_dataset --local`). Qwen tokenizers need **`sentencepiece`** (listed in `requirements-trl.txt`).
 
 **Track-H (richer prompt + bigger model, optional, paid GPU on HF or Colab):**
 

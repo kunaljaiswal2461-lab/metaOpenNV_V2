@@ -12,8 +12,9 @@ Hackathon rules ask for **URLs**, not large binaries in the Space repo. Add ever
 | Mini-blog (Hugging Face post) | *add in Phase 7* | TBD |
 | Demo video (YouTube, under 2 minutes) | *add in Phase 7* | TBD |
 | Phase 4 plots (PNG) | [`results/phase4_episode_return.png`](../results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](../results/phase4_mean_return_bar.png) | Regenerate: `python -m eval.phase4_benchmark` |
-| Phase 3 TRL SFT loss | [`results/trl_sft_loss.png`](../results/trl_sft_loss.png) | Regenerate: `python scripts/trl_sft_train.py` after `collect_sft_dataset` |
-| Phase 3 LLM-on-env metrics | [`results/phase3_eval_metrics.md`](../results/phase3_eval_metrics.md), [`results/phase3_eval_bar.png`](../results/phase3_eval_bar.png) | Regenerate: `python scripts/eval_llm_on_env.py --models name=path ...` |
+| Phase 3 trained adapter (Hub model) | https://huggingface.co/Kj2461/metaOpenNV-sft-qwen15 | LoRA r=16 on Qwen2.5-1.5B, T4-medium, 1 epoch on 5,850 rows |
+| Phase 3 TRL SFT loss | [`results/trl_sft_loss.png`](../results/trl_sft_loss.png) | Final loss 0.291, mean token acc 0.888 (initial 1.74 / 0.61) |
+| Phase 3 LLM-on-env metrics | [`results/phase3_eval_metrics.md`](../results/phase3_eval_metrics.md), [`results/phase3_eval_bar.png`](../results/phase3_eval_bar.png) | Regenerate: `python scripts/eval_llm_on_env.py --models base=Qwen/Qwen2.5-1.5B-Instruct sft=Kj2461/metaOpenNV-sft-qwen15 --local` |
 | Phase 4 metrics table | [`results/phase4_metrics.md`](../results/phase4_metrics.md) | Committed |
 | Slides (Google Slides / PDF host) | *optional* | TBD |
 | Weights & Biases (or other) run | *optional — link to a specific run* | TBD |
