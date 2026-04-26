@@ -86,6 +86,11 @@ def main() -> None:
     parser.add_argument("--lora-r", type=int, default=16)
     parser.add_argument("--lora-alpha", type=int, default=32)
     parser.add_argument("--lora-dropout", type=float, default=0.05)
+    parser.add_argument(
+        "--load-in-4bit",
+        action="store_true",
+        help="Quantize the base model to NF4 (bitsandbytes). Required for 3B+ on T4.",
+    )
     args = parser.parse_args()
 
     try:
@@ -107,6 +112,17 @@ def main() -> None:
         if looks_big and free_gb < 24.0:
             print(f"[trl_sft_train] auto-enabling LoRA: model={args.model_id}, total VRAM={free_gb:.1f} GB")
             args.use_lora = True
+
+    # Auto-enable 4-bit on T4-class GPUs for 3B+ models so we don't OOM.
+    if not args.load_in_4bit and torch.cuda.is_available():
+        try:
+            free_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        except Exception:
+            free_gb = 0.0
+        looks_3b_plus = any(s in args.model_id for s in ("3B", "7B", "8B", "13B"))
+        if looks_3b_plus and free_gb < 24.0:
+            print(f"[trl_sft_train] auto-enabling 4-bit (NF4): model={args.model_id}, total VRAM={free_gb:.1f} GB")
+            args.load_in_4bit = True
 
     if not os.path.isfile(args.data):
         print(f"Dataset not found: {args.data}")
@@ -162,8 +178,39 @@ def main() -> None:
         )
         print(f"[trl_sft_train] using LoRA r={args.lora_r} alpha={args.lora_alpha} dropout={args.lora_dropout}")
 
+    # If 4-bit, build the quantized base model ourselves so SFTTrainer + PEFT
+    # can wrap it. Plain string model_id wouldn't pick up the quantization config.
+    model_for_trainer: object = args.model_id
+    if args.load_in_4bit:
+        try:
+            from transformers import AutoModelForCausalLM, BitsAndBytesConfig
+            from peft import prepare_model_for_kbit_training
+        except ImportError as e:
+            print(f"--load-in-4bit needs bitsandbytes + peft + transformers: {e}")
+            sys.exit(1)
+        compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+        bnb_cfg = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=compute_dtype,
+            bnb_4bit_use_double_quant=True,
+        )
+        print(f"[trl_sft_train] loading {args.model_id} in 4-bit NF4 (compute={compute_dtype})")
+        base_model = AutoModelForCausalLM.from_pretrained(
+            args.model_id,
+            quantization_config=bnb_cfg,
+            trust_remote_code=True,
+            device_map={"": 0} if torch.cuda.is_available() else None,
+        )
+        # Enable input-grad + cast LayerNorms; required before LoRA wrapping.
+        base_model = prepare_model_for_kbit_training(
+            base_model,
+            use_gradient_checkpointing=not args.no_gradient_checkpointing,
+        )
+        model_for_trainer = base_model
+
     trainer_kwargs = dict(
-        model=args.model_id,
+        model=model_for_trainer,
         args=sft_args,
         train_dataset=train_ds,
     )

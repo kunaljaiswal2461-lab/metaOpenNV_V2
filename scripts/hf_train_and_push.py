@@ -195,6 +195,9 @@ def _run_eval(args, *, hub_id: str, token: str | None) -> None:
         "--episodes", str(args.eval_episodes),
         "--max-steps", str(args.eval_max_steps),
         "--task-name", args.task_name,
+        "--prompt", args.prompt,
+        "--teacher", args.teacher,
+        "--history-len", str(args.history_len),
         "--local",
         "--metrics-out", metrics_out,
         "--bar-out", bar_out,
@@ -227,14 +230,38 @@ def main() -> None:
         help="local = run TradingEnvironment in-process (avoids HF proxy 429); "
              "http = hit SPACE_URL (legacy, rate-limited).",
     )
-    p.add_argument("--task-name", default="risk_aware_trading")
+    p.add_argument("--task-name", default=os.environ.get("COLLECT_TASK_NAME", "risk_aware_trading"))
+    p.add_argument(
+        "--prompt",
+        choices=("compact", "full"),
+        default=os.environ.get("COLLECT_PROMPT", "compact"),
+        help="Prompt style for SFT collect + eval; full = Track H rich prompt.",
+    )
+    p.add_argument(
+        "--teacher",
+        default=os.environ.get("COLLECT_TEACHER", "sma20"),
+        help="Teacher policy used by collect_sft_dataset (sma20, composite, ...).",
+    )
+    p.add_argument(
+        "--history-len",
+        type=int,
+        default=int(os.environ.get("COLLECT_HISTORY_LEN", "0")),
+        help="Last K (action, reward) pairs in the prompt; >0 enables Track H history tail.",
+    )
     p.add_argument(
         "--model-id",
         default=os.environ.get("PHASE3_MODEL_ID", "Qwen/Qwen2.5-0.5B-Instruct"),
         help="Base model id (env PHASE3_MODEL_ID overrides the CLI default).",
     )
-    p.add_argument("--epochs", type=int, default=1)
-    p.add_argument("--output-dir", default=os.path.join("results", "phase3_lora"))
+    p.add_argument("--epochs", type=int, default=int(os.environ.get("EPOCHS", "1")))
+    p.add_argument("--max-length", type=int, default=int(os.environ.get("MAX_LENGTH", "512")))
+    p.add_argument(
+        "--load-in-4bit",
+        action="store_true",
+        default=os.environ.get("LOAD_IN_4BIT", "").lower() in ("1", "true", "yes"),
+        help="Quantise the base model to NF4 before LoRA (required for 3B on T4).",
+    )
+    p.add_argument("--output-dir", default=os.environ.get("OUTPUT_DIR", os.path.join("results", "phase3_lora")))
     p.add_argument("--skip-collect", action="store_true")
     p.add_argument("--skip-push", action="store_true")
     p.add_argument("--private-repo", action="store_true", help="Create the Hub model repo as private.")
@@ -245,6 +272,9 @@ def main() -> None:
         "--eval-max-steps", type=int, default=int(os.environ.get("EVAL_MAX_STEPS", "300"))
     )
     args = p.parse_args()
+    # Track H collects expand the dataset; default 30 episodes when full+composite is set.
+    if args.prompt == "full" and args.teacher == "composite":
+        args.collect_episodes = int(os.environ.get("COLLECT_EPISODES", str(max(args.collect_episodes, 30))))
 
     token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
     hub_id = (
@@ -281,7 +311,7 @@ def main() -> None:
 
     try:
         if not args.skip_collect:
-            _set_state(phase=f"collecting SFT data ({args.collect_mode})")
+            _set_state(phase=f"collecting SFT data ({args.collect_mode}) prompt={args.prompt} teacher={args.teacher}")
             collect_cmd = [
                 sys.executable,
                 os.path.join("scripts", "collect_sft_dataset.py"),
@@ -289,21 +319,26 @@ def main() -> None:
                 "--max-steps", str(args.collect_max_steps),
                 "--task-name", args.task_name,
                 "--out", args.data_out,
+                "--prompt", args.prompt,
+                "--teacher", args.teacher,
+                "--history-len", str(args.history_len),
             ]
             if args.collect_mode == "local":
                 collect_cmd.append("--local")
             _run(collect_cmd)
-        _set_state(phase=f"TRL SFT on {args.model_id}")
-        _run(
-            [
-                sys.executable,
-                os.path.join("scripts", "trl_sft_train.py"),
-                "--data", args.data_out,
-                "--model-id", args.model_id,
-                "--epochs", str(args.epochs),
-                "--output-dir", args.output_dir,
-            ]
-        )
+        _set_state(phase=f"TRL SFT on {args.model_id}{' (4-bit)' if args.load_in_4bit else ''}")
+        train_cmd = [
+            sys.executable,
+            os.path.join("scripts", "trl_sft_train.py"),
+            "--data", args.data_out,
+            "--model-id", args.model_id,
+            "--epochs", str(args.epochs),
+            "--output-dir", args.output_dir,
+            "--max-length", str(args.max_length),
+        ]
+        if args.load_in_4bit:
+            train_cmd.append("--load-in-4bit")
+        _run(train_cmd)
         _set_state(phase="locating checkpoint")
         ckpt = resolve_hf_checkpoint_dir(args.output_dir)
         if not os.path.isdir(ckpt):

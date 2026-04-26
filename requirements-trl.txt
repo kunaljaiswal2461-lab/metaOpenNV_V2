@@ -9,3 +9,5 @@ torch>=2.1.0
 matplotlib>=3.8.0
 sentencepiece>=0.1.99
 huggingface_hub>=0.26.0
+# Track H (3B + 4-bit LoRA on T4): NF4 quantisation. Linux/CUDA only.
+bitsandbytes>=0.43.0; sys_platform != "win32"
