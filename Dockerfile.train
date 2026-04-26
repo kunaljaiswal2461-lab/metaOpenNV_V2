@@ -1,0 +1,26 @@
+# GPU training job Space — do not use as the submission API image.
+# See docs/HF_GPU_TRAIN.md: create a separate Space, set Dockerfile path to this file,
+# enable Nvidia hardware, and set HF_TOKEN + HF_HUB_MODEL_ID secrets.
+
+FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-trl.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -r requirements-trl.txt
+
+COPY . .
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONUTF8=1
+ENV SPACE_URL=https://huggingface.co/spaces/Kj2461/metaOpenNV_V2
+
+EXPOSE 7860
+
+CMD ["python", "scripts/hf_train_and_push.py"]

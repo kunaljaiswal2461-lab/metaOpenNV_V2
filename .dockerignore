@@ -1,0 +1,12 @@
+# Keep API + training images small and reproducible
+.git
+**/__pycache__
+.pytest_cache
+.venv
+venv
+ENV
+*.pyc
+results
+data/trl_sft_train*.jsonl
+.antigravity
+*.log

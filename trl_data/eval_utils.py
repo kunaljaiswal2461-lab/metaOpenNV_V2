@@ -8,12 +8,40 @@ matplotlib dependency; only stdlib.
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 
 # Valid action digits emitted by the env contract.
 _VALID_ACTION_CHARS: frozenset[str] = frozenset("012")
 # Default chosen when the model produces nothing parsable.
 _FALLBACK_ACTION: int = 0
+
+
+def resolve_hf_checkpoint_dir(ident: str) -> str:
+    """
+    If ``ident`` is a TRL output directory without ``config.json`` at the root
+    (only ``checkpoint-*`` subfolders), return the latest ``checkpoint-*`` path
+    that contains ``config.json``. Otherwise return ``ident`` unchanged.
+    """
+    if not ident or not os.path.isdir(ident):
+        return ident
+    root_cfg = os.path.join(ident, "config.json")
+    if os.path.isfile(root_cfg):
+        return ident
+    candidates: list[tuple[int, str]] = []
+    try:
+        for name in os.listdir(ident):
+            if name.startswith("checkpoint-") and name[len("checkpoint-") :].isdigit():
+                step = int(name.split("-", 1)[1])
+                sub = os.path.join(ident, name)
+                if os.path.isfile(os.path.join(sub, "config.json")):
+                    candidates.append((step, sub))
+    except OSError:
+        return ident
+    if not candidates:
+        return ident
+    candidates.sort(key=lambda x: x[0])
+    return candidates[-1][1]
 
 
 def parse_action(text: str) -> int:
@@ -105,4 +133,5 @@ __all__ = [
     "format_metrics_md",
     "parse_action",
     "parse_models",
+    "resolve_hf_checkpoint_dir",
 ]

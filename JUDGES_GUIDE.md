@@ -103,14 +103,16 @@ Pipeline (see README **Phase 3**):
    `Qwen/Qwen2.5-0.5B-Instruct`; on CPU you can pass
    `--model-id distilgpt2 --no-gradient-checkpointing` for a smoke run.
    Outputs `results/trl_sft_loss.png` and an adapter directory.
-3. Re-run via [`colab/phase3_trl_sft.ipynb`](colab/phase3_trl_sft.ipynb)
+3. GPU training: [`docs/HF_GPU_TRAIN.md`](docs/HF_GPU_TRAIN.md) (second HF Space,
+   `Dockerfile.train`, `scripts/hf_train_and_push.py`) or the optional
+   [`colab/phase3_trl_sft.ipynb`](colab/phase3_trl_sft.ipynb)
    ([Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb)).
 
-### 3.4 Stretch — bigger model on Colab (optional)
+### 3.4 Stretch — bigger model on paid GPU (optional)
 
 Same pipeline with `--model-id Qwen/Qwen2.5-3B-Instruct` and 4-bit + LoRA on
-Colab L4/A100 (described in README **Phase 3** under the Colab notebook). This
-is optional for v1 and not required for judging.
+an HF Space L4/A100 or Colab (README **Phase 3**). Optional for v1 and not
+required for judging.
 
 ---
 
@@ -141,7 +143,7 @@ Phase 4 provides the regenerable bar/line plots; Phase 3 provides
 - **Tests:** `python -m pytest tests/test_env.py -q` (static),
   `python verify_shape.py` (HTTP smoke after `python server/app.py`).
 - **Phase 4 eval:** `python -m eval.phase4_benchmark`.
-- **Phase 3 SFT:** see README Phase 3 or the Colab.
+- **Phase 3 SFT:** README Phase 3, [`docs/HF_GPU_TRAIN.md`](docs/HF_GPU_TRAIN.md), or optional Colab.
 
 ---
 

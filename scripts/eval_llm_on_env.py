@@ -47,7 +47,12 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from client import TradingEnv
-from trl_data.eval_utils import format_metrics_md, parse_action, parse_models
+from trl_data.eval_utils import (
+    format_metrics_md,
+    parse_action,
+    parse_models,
+    resolve_hf_checkpoint_dir,
+)
 from trl_data.prompt_utils import build_user_prompt
 from trl_data.teacher import TEACHERS, get_teacher
 
@@ -55,34 +60,6 @@ from trl_data.teacher import TEACHERS, get_teacher
 class _EnvLike(Protocol):
     def reset(self, task_name: str | None = None, **kwargs: Any) -> Any: ...
     def step(self, action: int, amount: float = 1.0) -> Any: ...
-
-
-def _resolve_hf_model_path(ident: str) -> str:
-    """
-    If ``ident`` is an output directory without ``config.json`` at the root
-    (e.g. ``results/phase3_lora`` after TRL saves only ``checkpoint-*``),
-    pick the lexically greatest ``checkpoint-*`` subfolder so users can pass
-    the parent ``--output-dir`` from training.
-    """
-    if not ident or not os.path.isdir(ident):
-        return ident
-    root_cfg = os.path.join(ident, "config.json")
-    if os.path.isfile(root_cfg):
-        return ident
-    candidates: list[tuple[int, str]] = []
-    try:
-        for name in os.listdir(ident):
-            if name.startswith("checkpoint-") and name[len("checkpoint-") :].isdigit():
-                step = int(name.split("-", 1)[1])
-                sub = os.path.join(ident, name)
-                if os.path.isfile(os.path.join(sub, "config.json")):
-                    candidates.append((step, sub))
-    except OSError:
-        return ident
-    if not candidates:
-        return ident
-    candidates.sort(key=lambda x: x[0])
-    return candidates[-1][1]
 
 
 class _LocalTradingEnvGym:
@@ -287,7 +264,7 @@ def main() -> None:
 
     rows = []
     for name, ident in models.items():
-        ident = _resolve_hf_model_path(ident)
+        ident = resolve_hf_checkpoint_dir(ident)
         print(f"\n=== {name} ({ident}) ===")
         tokenizer = AutoTokenizer.from_pretrained(ident, trust_remote_code=True)
         if tokenizer.pad_token_id is None:

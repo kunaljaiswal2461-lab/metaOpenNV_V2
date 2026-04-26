@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from trl_data.eval_utils import format_metrics_md, parse_action, parse_models
+from trl_data.eval_utils import (
+    format_metrics_md,
+    parse_action,
+    parse_models,
+    resolve_hf_checkpoint_dir,
+)
 
 
 def test_parse_action_picks_first_valid_digit():
@@ -38,6 +43,21 @@ def test_parse_models_rejects_duplicates():
 def test_parse_models_rejects_empty_input():
     with pytest.raises(ValueError):
         parse_models([])
+
+
+def test_resolve_hf_checkpoint_dir(tmp_path):
+    root = tmp_path / "out"
+    root.mkdir()
+    (root / "checkpoint-10").mkdir()
+    (root / "checkpoint-10" / "config.json").write_text("{}")
+    (root / "checkpoint-20").mkdir()
+    (root / "checkpoint-20" / "config.json").write_text("{}")
+    assert resolve_hf_checkpoint_dir(str(root)) == str(root / "checkpoint-20")
+
+    direct = tmp_path / "direct"
+    direct.mkdir()
+    (direct / "config.json").write_text("{}")
+    assert resolve_hf_checkpoint_dir(str(direct)) == str(direct)
 
 
 def test_format_metrics_md_table_shape():

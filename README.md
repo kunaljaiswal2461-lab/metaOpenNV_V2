@@ -48,7 +48,8 @@ Single place for reviewers (mirrored in [`docs/MATERIALS.md`](docs/MATERIALS.md)
 | **Hugging Face Space** | [https://huggingface.co/spaces/Kj2461/metaOpenNV_V2](https://huggingface.co/spaces/Kj2461/metaOpenNV_V2) | Runnable environment |
 | **GitHub source** | [https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2](https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2) | Version-controlled code |
 | **OpenEnv manifest** | [`openenv.yaml`](openenv.yaml) | Default `observation_space.shape: [203]` matches `WINDOW_SIZE=20` in Docker |
-| **Training Colab** (HF TRL SFT) | [Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb) | Clone repo, `pip install -r requirements-trl.txt`, collect JSONL from Space, run `SFTTrainer`; loss → `results/trl_sft_loss.png` |
+| **Training on HF GPU** (recommended if you have Hub credits) | [`docs/HF_GPU_TRAIN.md`](docs/HF_GPU_TRAIN.md) | Second Space with `Dockerfile.train` + Nvidia hardware; pushes adapter to a **Model** repo (`HF_HUB_MODEL_ID`). |
+| **Training Colab** (optional fallback) | [Open in Colab](https://colab.research.google.com/github/kunaljaiswal2461-lab/metaOpenNV_V2/blob/main/colab/phase3_trl_sft.ipynb) | Same TRL flow without a GPU Space. |
 | **Mini-blog** (HF post) | *URL to be added in Phase 7* | &lt; 2 min read OK |
 | **Demo video** (YouTube) | *URL to be added in Phase 7* | **&lt; 2 minutes**; link only |
 | **Plots / results** | [`results/phase4_episode_return.png`](results/phase4_episode_return.png), [`results/phase4_mean_return_bar.png`](results/phase4_mean_return_bar.png), [`results/phase4_metrics.md`](results/phase4_metrics.md), [`results/trl_sft_loss.png`](results/trl_sft_loss.png) (distilgpt2 smoke, 360 rows) | Phase 4: `python -m eval.phase4_benchmark`. Phase 3: [`scripts/trl_sft_train.py`](scripts/trl_sft_train.py) after [`scripts/collect_sft_dataset.py`](scripts/collect_sft_dataset.py) |
@@ -127,6 +128,8 @@ python scripts/collect_sft_dataset.py --episodes 12 --max-steps 400 --task-name 
 python scripts/trl_sft_train.py --data data/trl_sft_train.jsonl --epochs 1 --output-dir results/phase3_lora
 ```
 
+**Train on Hugging Face (paid GPU / credits, no Colab):** create a **separate** Space from this repo, set **Dockerfile** to [`Dockerfile.train`](Dockerfile.train), enable **Nvidia T4+** hardware, and set secrets `HF_TOKEN` + `HF_HUB_MODEL_ID`. On boot, [`scripts/hf_train_and_push.py`](scripts/hf_train_and_push.py) collects from your live API Space, runs TRL, and **pushes** the latest checkpoint to the Hub model repo. Full walkthrough: [`docs/HF_GPU_TRAIN.md`](docs/HF_GPU_TRAIN.md).
+
 **Outputs:** `data/trl_sft_train.jsonl` is gitignored (regenerate anytime); **`results/trl_sft_loss.png`** and adapter weights under **`--output-dir`**.
 
 **Closing the loop — base vs fine-tuned on the live env**
@@ -144,7 +147,7 @@ python scripts/eval_llm_on_env.py \
 
 If TRL saved only `results/phase3_lora/checkpoint-*`, you can still pass `sft=results/phase3_lora` — the eval script resolves the latest checkpoint folder. For dev without a running Space, add **`--local`** (same physics as `collect_sft_dataset --local`). Qwen tokenizers need **`sentencepiece`** (listed in `requirements-trl.txt`).
 
-**Track-H (richer prompt + bigger model, optional, paid Colab):**
+**Track-H (richer prompt + bigger model, optional, paid GPU on HF or Colab):**
 
 ```bash
 python scripts/collect_sft_dataset.py \
@@ -157,7 +160,7 @@ python scripts/eval_llm_on_env.py --models sft_3b=results/phase3_lora_3b \
   --prompt full --history-len 5 --task-name multi_horizon_trading
 ```
 
-**Judges:** use the **Phase 1** Colab link — it runs the same commands against your Space.
+**Judges:** the live **Space** URL in Phase 1 is the runnable env; training is reproducible via **HF GPU Space** ([`docs/HF_GPU_TRAIN.md`](docs/HF_GPU_TRAIN.md)) or the optional Colab notebook.
 
 ---
 
