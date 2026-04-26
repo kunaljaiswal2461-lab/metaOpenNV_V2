@@ -704,21 +704,37 @@ _CSS = """
 .regime-rules { color: #94a3b8; font-size: 12px; margin: 0; padding-left: 22px; }
 .regime-rules li { margin: 4px 0; }
 
-/* === Indicator grid === */
+/* === Indicator strip (single horizontal row) === */
 .ind-grid {
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 10px;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding-bottom: 4px;
+    width: 100% !important;
 }
+.ind-grid::-webkit-scrollbar { height: 6px; }
+.ind-grid::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 3px; }
 .ind-card {
-    background: #0a0e15; border: 1px solid #1f2937; border-radius: 4px;
-    padding: 10px 12px; min-height: 78px;
-    display: flex; flex-direction: column; gap: 4px;
+    flex: 1 1 0 !important;
+    min-width: 108px !important;
+    max-width: 1fr;
+    background: #0a0e15;
+    border: 1px solid #1f2937;
+    border-radius: 4px;
+    padding: 8px 10px;
+    min-height: 78px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     transition: border-color 0.15s;
 }
 .ind-card:hover { border-color: #22c55e; }
-.ind-name { color: #64748b; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
-.ind-val { font-size: 16px; font-weight: 700; font-family: inherit; }
-.ind-spark { color: #475569; font-size: 12px; letter-spacing: 0.05em; line-height: 1; opacity: 0.85; }
+.ind-name { color: #64748b; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ind-val { font-size: 15px; font-weight: 700; font-family: inherit; white-space: nowrap; }
+.ind-spark { color: #475569; font-size: 11px; letter-spacing: 0.04em; line-height: 1; opacity: 0.85; white-space: nowrap; overflow: hidden; }
 
 /* === KPI strip === */
 .kpi-strip {
