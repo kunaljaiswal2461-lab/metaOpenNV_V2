@@ -102,7 +102,12 @@ Training curve also improved cleanly:
 - Phase 4 baselines: [`results/phase4_metrics.md`](../results/phase4_metrics.md)
 
 ---
+##Results benchmark of the model--
+please refer to the given file in the  same repository:
+link - https://github.com/kunaljaiswal2461-lab/metaOpenNV_V2/tree/main/results
 
 ## 20-Second Pitch I Would Say Live
 
 "This is an OpenEnv trading world where the model has to take actions repeatedly under cost and risk, not just answer finance questions. I fine-tuned Qwen 1.5B on trajectories from this same environment. After training, the model moved from always HOLD to meaningful BUY/HOLD behavior, and both reward and final portfolio value improved on held evaluations. So the result is a reproducible benchmark showing better closed-loop decision-making, not just better financial text generation."
+
+
