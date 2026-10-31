@@ -7,7 +7,7 @@ sdk: docker
 pinned: true
 ---
 
-# 🛰️ AntiGravity: Strategic SPY Market Intelligence
+# 🛰️ Product: Strategic SPY Market Intelligence
 **A high-fidelity Markov Decision Process (MDP) for Autonomous Financial Agents.**
 
 ---
